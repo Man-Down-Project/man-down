@@ -6,4 +6,4 @@
 
 ## Topology
 
-![Man-Down Diagram](images/mandown-topology.png) 
+![Man-Down Diagram](images/topology-mandown.png) 
