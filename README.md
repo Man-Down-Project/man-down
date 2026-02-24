@@ -1,153 +1,108 @@
 # Man-Down Security Node
 
-A distributed safety system built with **ESP32 (C)** at the edge and **Rust** at the fog layer.
+A distributed industrial safety system built with **ESP32 (C + FreeRTOS)** at the edge and **Rust** at the fog layer.
 
-This project detects:
+Designed for low-latency, safety-critical environments with local decision-making, secure mesh communication, and encrypted fog storage.
+
+---
+
+## Overview
+
+The system detects and responds to:
 
 - Man-Down events (fall detection)
 - Geofence violations
-- Suspicious or unstable device behavior via a dynamic Trust Score
+- Device instability or suspicious behavior via a dynamic Trust Score
 
-Designed for industrial and safety-critical environments with low-latency local detection and secure MQTT communication.
+Architecture:
 
----
+[ Edge (ESP32 + Mesh) ] → [ Fog (Rust) ] → [ Optional Cloud ]
 
-## Features
-
-- Real-time fall detection on ESP32
-- RTOS-based edge architecture
-- Secure MQTT over TLS
-- Geofence engine (Fog layer)
-- Dynamic Trust Score per device
-- Heartbeat & replay protection
-- Local fail-safe alarm (buzzer/LED)
-- Modular and scalable design
+Edge reacts immediately.  
+Fog validates, scores, logs, encrypts, and escalates.
 
 ---
 
-## Architecture Overview
+# Core Features
 
-The system is divided into two main layers:
-[ Edge (ESP32, C) ] → [ Fog (Rust) ] → [ Optional Cloud ]
+## Edge Layer (ESP32, C + FreeRTOS)
 
----
+Real-time safety decision layer.
 
-### Edge Layer (ESP32, C + FreeRTOS)
-
-Responsible for real-time detection and low-latency safety decisions.
-
-**Handles:**
+Handles:
 
 - Accelerometer sampling
-- Fall detection (state machine)
+- Fall detection (multi-stage state machine)
 - Inactivity detection
-- Heartbeat messages
-- Sequence numbers (anti-replay)
-- Local alarm activation
-- MQTT publishing over TLS
+- Local alarm activation (buzzer / LED)
+- Heartbeat transmission
+- Sequence-based replay protection
+- Mesh communication
+- MQTT over TLS (mTLS)
+- Event retry with acknowledgment for critical alarms
 
-Edge devices take the **first safety decision**.
+Edge makes the **first safety decision** to avoid network dependency.
 
 ---
 
-### Fog Layer (Rust)
+## Fog Layer (Rust)
 
-Responsible for coordination, validation, and security analysis.
+Coordination, validation, and security analysis layer.
 
-**Handles:**
+Handles:
 
-- MQTT subscription
+- MQTT subscription (QoS 1)
+- Mutual TLS authentication
 - Geofence validation
 - Rule engine
 - Trust Score calculation
-- Event logging
-- Alarm prioritization & escalation
-- Secure storage of sensitive data using **SQLite + SQLCipher**
-- Column-level encryption using **libsodium** for highly sensitive fields (e.g., personal identifiers or health metrics)
+- Event deduplication (sequence-aware)
+- Alarm escalation & prioritization
+- Secure storage
 
-Fog validates and escalates edge events.
+Storage stack:
 
----
+- SQLite
+- SQLCipher (full database encryption)
+- libsodium (column-level encryption for sensitive fields)
 
-## Man-Down Detection
-
-Implemented as a lightweight state machine on the ESP32.
-
-Detection logic includes:
-
-1. Sudden acceleration spike  
-2. Impact detection  
-3. Orientation change  
-4. Inactivity timeout  
-5. User confirmation window  
-
-If no acknowledgment is received → emergency event is published.
+Fog acts as a **security validation and escalation authority**.
 
 ---
 
-## Geofence Engine
+# Communication Model
 
-Implemented in Rust on the fog node.
+## Network Layer
 
-Supports:
+- Secure mesh topology between edge devices
+- Local routing redundancy
+- Timestamp-based validation
+- Message expiration handling
 
-- Zone validation via zone ID
-- Risk-level based escalation
-- Restricted zone detection
+## Messaging Layer
 
-Example logic:
+- MQTT over **Mutual TLS (mTLS)**
+- QoS 1 (At-Least-Once Delivery)
+- Application-level idempotency
+- Explicit acknowledgment for critical events
 
-IF man_down AND zone_risk > threshold  
-→ Critical alarm
+### Why QoS 1?
 
-IF zone not allowed  
-→ Security violation
+QoS 1 provides:
 
----
+- Lower latency than QoS 2
+- Reduced memory overhead on ESP32
+- Reliable delivery with deduplication at fog layer
 
-## Trust Score System
-
-Each edge node maintains a dynamic Trust Score (0–100).
-
-Initial score: **100**  
-Adjusted continuously based on behavior.
-
-### Score Decreases When:
-
-- Missed heartbeats
-- Invalid sequence numbers
-- Replay attempts
-- Sensor values out of range
-- Abnormal timing patterns
-
-### Score Increases When:
-
-- Stable communication
-- Valid telemetry
-- Consistent sampling
-
-### Response Levels
-
-| Score   | Status         |
-|----------|---------------|
-| 80–100   | Normal        |
-| 50–79    | Warning       |
-| 20–49    | Isolate node  |
-| <20      | Critical      |
-
-This provides a lightweight intrusion detection mechanism without heavy machine learning.
+Critical events (e.g., man_down) use explicit acknowledgment logic in addition to QoS 1.
 
 ---
 
-## Communication Model
+# Event Reliability Strategy
 
-- MQTT over TLS
-- QoS 2 (Exactly once delivery) between Edge and Fog
-- Sequence numbers per message
-- Heartbeat monitoring
-- Event-driven publishing (no unnecessary traffic)
+## Sequence-Based Deduplication
 
-Example payload:
+Each message includes:
 
 ```json
 {
@@ -160,97 +115,177 @@ Example payload:
 }
 
 ```
-## Modular Design
-
-### Edge Modules
-- Sensor module
-- Detection engine
-- Communication module
-- Alarm module
-
-### Fog Modules
-- MQTT client
-- Rule engine
-- Trust Score engine
-- Logging module
-- Secure storage module (SQLite + SQLCipher + libsodium)
-
-This allows easy feature expansion and scalability.
 
 ---
 
-## Data Handling
+## Message Validation & Deduplication
 
-### Collected Data
-- Acceleration magnitude
-- Activity level
-- Orientation changes
-- Heartbeat timing
+Fog stores the last accepted sequence number per device.
 
-### Processed Data
-- Fall events
-- Zone violations
-- Device trust metrics
+Messages with:
 
-### Storage
+- Lower sequence numbers → ignored  
+- Duplicate sequence numbers → ignored  
+- Expired timestamps → discarded  
+
+This ensures idempotent processing under MQTT QoS 1.
+
+---
+
+## Critical Event Acknowledgment
+
+For safety-critical events:
+
+1. Edge publishes `man_down_event`
+2. Fog validates and responds with acknowledgment
+3. Edge retries until acknowledgment is received or timeout is reached
+4. If no acknowledgment → local escalation persists
+
+This avoids reliance on QoS 2 while maintaining safety reliability.
+
+---
+
+# Man-Down Detection
+
+Implemented as a lightweight state machine on the ESP32.
+
+## Detection Stages
+
+1. Sudden acceleration spike  
+2. Impact detection  
+3. Orientation change  
+4. Inactivity timeout  
+5. User confirmation window  
+
+If no acknowledgment is received → emergency event is published.
+
+Edge alarms activate immediately, independent of fog.
+
+---
+
+# Geofence Engine (Fog)
+
+Implemented in Rust.
+
+## Supports
+
+- Zone ID validation  
+- Risk-based escalation  
+- Restricted zone detection  
+
+## Example Logic
+
+IF `man_down` AND `zone_risk > threshold`  
+→ Critical alarm  
+
+IF zone not allowed  
+→ Security violation  
+
+---
+
+# Security Model
+
+## Mutual TLS (mTLS)
+
+- All devices authenticate with client certificates  
+- Certificate validation at fog  
+- Rogue device prevention  
+- Certificate revocation support  
+
+---
+
+## Replay Protection
+
+- Per-device sequence numbers  
+- Timestamp validation  
+- Expiration windows  
+
+---
+
+## Encrypted Storage
+
 Fog node stores:
-- Event logs (encrypted)
-- Trust history (encrypted)
-- Alarm history (encrypted)
 
-**Encryption Strategy:**
-- Full-database encryption via SQLCipher
-- Column-level encryption for sensitive fields via libsodium (e.g., personal identifiers, sensitive health metrics)
-- Keys are stored securely in the Fog node and rotated periodically
-- Edge devices never store sensitive data in plaintext
+- Event logs (encrypted)  
+- Alarm history (encrypted)  
 
----
+### Encryption Strategy
 
-## Performance Strategy
-- Event-driven RTOS tasks
-- Edge-side filtering
-- Minimal MQTT payload size
-- Async Rust backend
-- Low-latency local alarm triggering
+- Full-database encryption via SQLCipher  
+- Column-level encryption via libsodium (for sensitive fields)  
+- Periodic key rotation  
+- Secure key storage on fog node  
+
+Edge devices never store sensitive data in plaintext.
 
 ---
 
-## Security Measures
-- MQTT over TLS
-- Sequence-based replay protection
-- Heartbeat monitoring
-- Device-level Trust Score
-- Local fail-safe behavior
-- Encrypted storage: SQLite database encrypted with SQLCipher
-- Sensitive column encryption: libsodium for critical fields
-- Key management and rotation at fog layer
+# Data Handling
 
-Designed with distributed security in mind:  
-Edge reacts immediately, Fog verifies, encrypts, and escalates.
+## Collected Data
 
----
+- Acceleration magnitude  
+- Orientation changes  
+- Activity level  
+- Heartbeat timing  
+- Zone hints  
 
-## Testing Focus
-- Fall detection accuracy
-- Latency measurement (Edge → Fog)
-- Packet loss resilience
-- Trust Score stability under normal operation
-- Simulated replay and fault scenarios
-- Data encryption validation and key rotation tests
+## Processed Data
+
+- Fall events  
+- Geofence violations  
+- Alarm history  
+
+**Data minimization principle applied:**  
+Irrelevant data is not persisted.
 
 ---
 
-## Future Improvements
-- GPS-based geofencing
-- Hardware secure element
-- Mutual TLS authentication
-- Mobile monitoring interface
-- Redundant fog nodes
-- ML-enhanced anomaly detection
+# Performance Strategy
+
+- Event-driven RTOS tasks  
+- Edge-side filtering  
+- Minimal MQTT payload size  
+- Asynchronous Rust backend  
+- Defined latency budget per component  
+- Local alarm triggering independent of fog  
 
 ---
 
-## Why C + Rust?
-- C for deterministic real-time control on microcontrollers
-- Rust for safe, concurrent, network-facing logic
-- Clear separation between low-level control and high-level security
+# Testing Focus
+
+- Fall detection accuracy  
+- Edge → Fog latency measurement  
+- Mesh stability under load  
+- Replay simulation  
+- Fault injection  
+- Encryption validation  
+- Key rotation tests  
+
+---
+
+# Future Improvements
+
+- Hardware secure element  
+- Redundant fog nodes (HA setup)  
+- ML-enhanced anomaly detection  
+- GPS-assisted geofencing  
+- Fleet management interface  
+
+---
+
+# Why C + Rust?
+
+## C
+
+- Deterministic real-time control  
+- Precise hardware interaction  
+- Low-level safety logic  
+
+## Rust
+
+- Memory safety  
+- Concurrency without data races  
+- Secure network-facing services  
+
+Clear separation between real-time safety logic and security orchestration.
