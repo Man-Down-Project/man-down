@@ -4,10 +4,10 @@
 
 ## Topology
 
-![Man-Down Diagram](images/topology-mandown-new.png) 
+![Man-Down Diagram](images/topology-mandown.png) 
 
 ## Mesh network overview
 
-![Mesh-network](images/mesh-overview.png)
-![Mesh](images/mesh-node.png)
+![Mesh-network](images/Mesh-net.png)
+![Mesh](images/Meshnetwork.png) 
 
