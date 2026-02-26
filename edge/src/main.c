@@ -3,8 +3,13 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
-void app_main() 
+#include "ble.h"
 
+static const char *TAG = "MAIN";
+
+void app_main(void)
 {
-    
+    ESP_LOGI(TAG, "Starting application");
+
+    ble_init();
 }
