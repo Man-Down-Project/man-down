@@ -1,3 +1,4 @@
+use chrono::Duration;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -23,7 +24,16 @@ pub enum Incident {
 impl Envelope {
     pub fn validate_basic(&self) -> Result<(), String> {
         if self.device_id.trim().is_empty() {
+            return Err("device_id is empty".into());
+        }
+        if self.mesh_node_id.trim().is_empty() {
             return Err("mesh_node_id is empty".into());
+        }
+        if self.seq == 0 {
+            return Err("seq must be > 0".into());
+        }
+        if self.sent_at > Utc::now() + Duration::minutes(5) {
+            return Err("timestamp too far in future".into());
         }
         Ok(())
     }

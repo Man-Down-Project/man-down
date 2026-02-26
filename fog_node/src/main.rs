@@ -1,10 +1,24 @@
 mod events;
 
 use events::{Envelope, Incident};
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() {
     env_logger::init();
+
+    let (tx, mut rx) = mpsc::channel::<Envelope>(100);
+
+    let processor = tokio::spawn(async move {
+        while let Some(env) = rx.recv().await {
+            if let Err(e) = env.validate_basic() {
+                log::warn!("Dropped invalid envelope: {}", e);
+                continue;
+            }
+
+            process_envelope(env).await;
+        }
+    });
 
     let raw = r#"
     {
@@ -13,15 +27,26 @@ async fn main() {
     "seq": 42,
     "sent_at": "2026-02-26T18:00:00Z",
     "incident": {
-    "type": "ManDown",
-    "zone_hint": "Zone-A"
+      "type": "ManDown",
+      "zone_hint": "Zone-A"
 }
 }
 "#;
     let env: Envelope = serde_json::from_str(raw).expect("Failed to parse Envelope");
-    env.validate_basic().expect("basic validation failed");
+    tx.send(env).await.expect("processor dropped");
 
-    log::info!("Parsed envelope: {:?}", env);
+    drop(tx); //stäng av kanalen så prosessorn kan avsluta (demo)
+
+    processor.await.unwrap(); //vänta tills processen blir klar
+}
+
+async fn process_envelope(env: Envelope) {
+    log::info!(
+        "Processing device_id={} seq={} incident={:?}",
+        env.device_id,
+        env.seq,
+        env.incident
+    );
 
     match env.incident {
         Incident::ManDown { zone_hint } => {
