@@ -1,20 +1,30 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum EventType {
-    ManDown,
-    Meshdisconnect,
-    Login,
-    Logout,
-    BatteryLow,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Envelope {
+    pub device_id: String,
+    pub mesh_node_id: String,
+    pub seq: u64,
+    pub sent_at: DateTime<Utc>,
+    pub incident: Incident,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Incident {
-    worker_id: String,
-    device_id: String,
-    event_type: EventType,
-    timestamp: String,
-    battery_level: Option<u8>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Incident {
+    ManDown { zone_hint: Option<String> },
+    MeshDisconnect { duration_s: u32 },
+    Login { worker_id: String },
+    Logout { worker_id: String },
+    BatteryLow { battery_level: u8 },
+}
+
+impl Envelope {
+    pub fn validate_basic(&self) -> Result<(), String> {
+        if self.device_id.trim().is_empty() {
+            return Err("mesh_node_id is empty".into());
+        }
+        Ok(())
+    }
 }
