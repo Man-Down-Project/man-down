@@ -5,18 +5,10 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
-<<<<<<< HEAD
 #include "ble.h"
 
 static const char *TAG = "MAIN";
 
-void app_main(void)
-{
-    ESP_LOGI(TAG, "Starting application");
-
-    ble_init();
-}
-=======
 #define BUTTON_GPIO 10 // Button pin
 #define BUZZER_GPIO 12 // Buzzer pin
 #define Accelerometer_GPIO 22 //Accelerometer pin
@@ -37,6 +29,12 @@ typedef struct {
 
 
 
+void app_main(void)
+{
+    ESP_LOGI(TAG, "Starting application");
+
+    ble_init();
+}
 
  
 /* lite test bara
@@ -82,4 +80,3 @@ void app_main(void) {
         vTaskDelay(pdMS_TO_TICKS(50)); // simple debounce
     }
 }*/
->>>>>>> 168cc16 (test)
