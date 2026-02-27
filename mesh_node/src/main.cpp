@@ -26,31 +26,71 @@ typedef struct{
 
 node_data_t my_node;
 
+BLEService meshService("12345678-1234-1234-1234-123456789abc"); // UUID
+BLECharacteristic eventChar(
+    "87654321-4321-4321-4321-cba987654321", 
+    BLEWrite | BLEWriteWithoutResponse, 
+    MAX_PAYLOAD
+);
+
+
+void simulateEdgePacket() { // Fake BLE packet data
+   
+    uint8_t fakePacket[MAX_PAYLOAD] = {0xA5, 0x01, 0x02, 0x03};
+    int len = 4;
+
+    // Simulate eventChar
+    Serial.print("Simulated packet received: ");
+    for (int i = 0; i < len; i++) {
+        Serial.print(fakePacket[i], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
+}
+
 void setup() {
 
   Serial.begin(115200);
+  while (!Serial);
+  Serial.println("Hello");
 
   my_node.node_id = 1;
   my_node.parent_id = 0;
   my_node.node_depth = 1;
   my_node.last_parent_heartbeat = millis();
-  my_node.payload[0] = 0xA5;
-  my_node.payload_len = 1;
 
+  /*
+  if (!BLE.begin()) {
+    Serial.println("starting BLE module failed!");
+    while (1);
+  }
+
+  BLE.setLocalName("Node_1");
+  BLE.setAdvertisedService(meshService);
+
+  meshService.addCharacteristic(eventChar);
+  BLE.addService(meshService);
+
+  BLE.advertise();
+  Serial.println("Node BLE ready");
+  */
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-   // my_node.last_parent_heartbeat = millis();
-    Serial.print("node_id: ");
-    Serial.println(my_node.node_id);
-    Serial.println("Looping...");
-    delay(1000);
+  //BLE.poll();
+  simulateEdgePacket(); 
+
+  if (eventChar.written()){
+    int len = eventChar.valueLength();
+    uint8_t buf[MAX_PAYLOAD];
+    eventChar.readValue(buf, len);
+    
+    Serial.print("Received packet");
+    for (int i=0; i<len; i++) Serial.print(buf[i], HEX);
+    Serial.println();
+  }
+    delay(500);
 }
 
-// put function definitions here:
-//int myFunction(int x, int y) {
-  //return x + y;
-//}
 
 
