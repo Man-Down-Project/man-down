@@ -29,6 +29,21 @@ def struct{
 void setup() {
   // put your setup code here, to run once:
   //int result = myFunction(2, 3);
+  Serial.begin(115200);
+
+  my_node.node_id = 1;
+  my_node.parent_id = 0;
+  my_node.node_depth = 1;
+  my_node.last_parent_heartbeat_ms = millis();
+  my_node.node_id = 1;
+  my_node.parent_id = 0;
+  my_node.node_depth = 1;
+  my_node.last_parent_heartbeat_ms = millis();
+  my_node.payload[0] = 0xA5;
+  my_node.payload_len = 1;
+
+
+  Serial.println("Node initialized!");
 }
 
 void loop() {
