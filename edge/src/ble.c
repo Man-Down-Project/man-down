@@ -15,11 +15,18 @@
 
 #include "ble.h"
 
-struct ble_gap_adv_params adv_params = {
-        .conn_mode = BLE_GAP_CONN_MODE_UND,
-        .disc_mode = BLE_GAP_DISC_MODE_GEN,
+// struct ble_gap_adv_params adv_params = {
+//         .conn_mode = BLE_GAP_CONN_MODE_UND,
+//         .disc_mode = BLE_GAP_DISC_MODE_GEN,
+// };
+struct ble_gap_disc_params scan_params = {
+        .itvl = 0x50,
+        .window = 0x30,
+        .filter_policy = 0,
+        .passive = 0,
+        .limited = 0,
+        .filter_duplicates = 1
 };
-
 static const char *TAG = "BLE";
 static uint8_t own_addr_type;
 
@@ -39,21 +46,42 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGE(TAG, "Connection failed");
         }       
         break;
-
+    
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "Disconnected");
 
-        ble_gap_adv_start(own_addr_type,
-                          NULL,
-                          BLE_HS_FOREVER,
-                          &adv_params,
-                          gap_event,
-                          NULL);
+        ble_gap_disc(own_addr_type,
+                     300,
+                     &scan_params,
+                     gap_event,
+                     NULL);
         break;
 
-    case BLE_GAP_EVENT_ADV_COMPLETE:
-        ESP_LOGI(TAG, "Advertising complete");
+    case BLE_GAP_EVENT_DISC:
+        
+        struct ble_gap_disc_desc *desc = &event->disc;
+
+        ESP_LOGI(TAG, "Found device RSSI: %d", desc->rssi);
+
+        if (desc->rssi > -70) {
+            ESP_LOGI(TAG, "Connecting...");
+
+            ble_gap_disc_cancel();
+
+            ble_gap_connect(own_addr_type,
+                            &desc->addr,
+                            30000,
+                            NULL,
+                            gap_event,
+                            NULL);
+        }
         break;
+    
+    
+
+    // case BLE_GAP_EVENT_ADV_COMPLETE:
+    //     ESP_LOGI(TAG, "Advertising complete");
+    //     break;
     
     case BLE_GAP_EVENT_ENC_CHANGE:
         if (event->enc_change.status == 0) {
@@ -80,32 +108,19 @@ static void ble_app_on_sync(void)
         return;
     }
 
+    rc = ble_gap_disc(own_addr_type,
+                      BLE_HS_FOREVER,
+                      &scan_params,
+                      gap_event,
+                      NULL);
     
-    struct ble_hs_adv_fields fields;
-    memset(&fields, 0, sizeof(fields));
-
-    fields.name = (uint8_t *)"H2_EDGE";
-    fields.name_len = strlen("H2_EDGE");
-    fields.name_is_complete = 1;
-
-    fields.flags = BLE_HS_ADV_F_DISC_GEN |
-                   BLE_HS_ADV_F_BREDR_UNSUP;
-    
-    ble_gap_adv_set_fields(&fields);
-    
-    rc = ble_gap_adv_start(own_addr_type,
-                           NULL,
-                           BLE_HS_FOREVER,
-                           &adv_params,
-                           gap_event,
-                           NULL);
     
     if (rc != 0) {
-        ESP_LOGE(TAG, "Advertising start failed: %d", rc);
+        ESP_LOGE(TAG, "Scan start failed:: %d", rc);
         return;
+    } else {
+        ESP_LOGI(TAG, "Scanning started");
     }
-    
-    ESP_LOGI(TAG, "Advertising started");
 }
 
 static void ble_host_task(void *param)
