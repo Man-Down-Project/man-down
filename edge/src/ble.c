@@ -12,8 +12,9 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
-
+#include "ble_gatt_client.h"
 #include "ble.h"
+
 
 // struct ble_gap_adv_params adv_params = {
 //         .conn_mode = BLE_GAP_CONN_MODE_UND,
@@ -30,28 +31,39 @@ struct ble_gap_disc_params scan_params = {
 static const char *TAG = "BLE";
 static uint8_t own_addr_type;
 
+// varibles used for best RSSI pick
+static int best_rssi = -127;
+static ble_addr_t best_addr;
+static int best_found = 0;
+static uint16_t current_conn_handle;
+
+
+
 // GAP event handler
 static int gap_event(struct ble_gap_event *event, void *arg)
 {
     switch (event->type) 
     {
-
+    
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
             ESP_LOGI(TAG, "Connected");
 
-            //Start secuirity (this triggers pairing if needed)
-            ble_gap_security_initiate(event->connect.conn_handle);
+            current_conn_handle = event->connect.conn_handle;
+
+            ble_gap_security_initiate(current_conn_handle);
         } else {
             ESP_LOGE(TAG, "Connection failed");
-        }       
+        }
         break;
-    
+
     case BLE_GAP_EVENT_DISCONNECT:
+        
         ESP_LOGI(TAG, "Disconnected");
 
+        vTaskDelay(pdMS_TO_TICKS(2000));
         ble_gap_disc(own_addr_type,
-                     300,
+                     300, 
                      &scan_params,
                      gap_event,
                      NULL);
@@ -63,22 +75,37 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 
         ESP_LOGI(TAG, "Found device RSSI: %d", desc->rssi);
 
-        if (desc->rssi > -70) {
-            ESP_LOGI(TAG, "Connecting...");
-
-            ble_gap_disc_cancel();
+        if (desc->rssi > best_rssi) {
+            best_rssi = desc->rssi;
+            best_addr = desc->addr;
+            best_found = 1;
+        }
+        break;
+    
+    case BLE_GAP_EVENT_DISC_COMPLETE:
+    {
+        if (best_found) {
+            ESP_LOGI(TAG, "Best RSSI: %d ,connecting...",best_rssi);
 
             ble_gap_connect(own_addr_type,
-                            &desc->addr,
+                            &best_addr,
                             30000,
                             NULL,
                             gap_event,
                             NULL);
+            best_rssi = -127;
+            best_found = 0;
+        } else {
+            ESP_LOGI(TAG, "No device found, rescanning");
+
+            ble_gap_disc(own_addr_type,
+                         300,
+                         &scan_params,
+                         gap_event,
+                         NULL);
         }
         break;
-    
-    
-
+    }
     // case BLE_GAP_EVENT_ADV_COMPLETE:
     //     ESP_LOGI(TAG, "Advertising complete");
     //     break;
@@ -86,6 +113,11 @@ static int gap_event(struct ble_gap_event *event, void *arg)
     case BLE_GAP_EVENT_ENC_CHANGE:
         if (event->enc_change.status == 0) {
             ESP_LOGI(TAG, "Encryption established");
+
+            // här lägger man GATT write (heartbeat/larm)
+            ble_gattc_disc_all_svcs(current_conn_handle,
+                                    gatt_svc_cb,
+                                    NULL);
         } else {
             ESP_LOGE(TAG, "Encryption failed");
         }
@@ -109,7 +141,7 @@ static void ble_app_on_sync(void)
     }
 
     rc = ble_gap_disc(own_addr_type,
-                      BLE_HS_FOREVER,
+                      300,
                       &scan_params,
                       gap_event,
                       NULL);
@@ -179,3 +211,4 @@ void ble_init()
 
     nimble_port_freertos_init(ble_host_task);
 }
+
