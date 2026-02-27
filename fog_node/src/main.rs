@@ -64,5 +64,14 @@ async fn process_envelope(env: Envelope) {
         Incident::BatteryLow { battery_level } => {
             log::warn!("BatteryLow level={}", battery_level);
         }
+        Incident::SensorFault { fault } => {
+            log::warn!(
+                "SensorFault sensor={:?} severity={:?} code={:?} message={:?}",
+                fault.sensor,
+                fault.severity,
+                fault.code,
+                fault.message
+            );
+        }
     }
 }

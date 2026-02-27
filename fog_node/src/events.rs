@@ -19,6 +19,31 @@ pub enum Incident {
     Login { worker_id: String },
     Logout { worker_id: String },
     BatteryLow { battery_level: u8 },
+    //fel på sensor-parameter
+    SensorFault { fault: SensorFault },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SensorFault {
+    pub sensor: SensorType,
+    pub severity: FaultSeverity,
+    pub code: Option<u32>,
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SensorType {
+    Accelerometer,
+    Gyroscope,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FaultSeverity {
+    Warning,
+    Critical,
 }
 
 impl Envelope {
