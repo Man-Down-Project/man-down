@@ -48,6 +48,8 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+    my_node.last_parent_heartbeat_ms = millis();
+    delay(1000);
 }
 
 // put function definitions here:
