@@ -5,6 +5,6 @@ int gatt_svc_cb(uint16_t conn_handle,
                      const struct ble_gatt_error *error,
                      const struct ble_gatt_svc *service,
                      void *arg);
-
+void send_edge_packet(uint16_t conn_handle);
 
 #endif

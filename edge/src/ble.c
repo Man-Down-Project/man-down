@@ -106,9 +106,6 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         }
         break;
     }
-    // case BLE_GAP_EVENT_ADV_COMPLETE:
-    //     ESP_LOGI(TAG, "Advertising complete");
-    //     break;
     
     case BLE_GAP_EVENT_ENC_CHANGE:
         if (event->enc_change.status == 0) {
@@ -122,6 +119,22 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGE(TAG, "Encryption failed");
         }
         break;
+
+    case BLE_GAP_EVENT_NOTIFY_RX:
+    {
+        struct os_mbuf *om = event->notify_rx.om;
+
+        int len = OS_MBUF_PKTLEN(om);
+
+        ESP_LOGI(TAG, "Notification received, len=%d", len);
+
+        uint8_t data[len];
+        os_mbuf_copydata(om, 0, len, data);
+
+        ESP_LOGI(TAG, "ACK seq=%d status =%d", data[0], data[1]);
+
+        break;
+    }
 
     default:
         break;
@@ -199,8 +212,9 @@ void ble_init()
 // Enable bonding (store keys in NVS)
     ble_hs_cfg.sm_bonding = 1;
 
-// No MITM (not sure what this does yet.)
-    ble_hs_cfg.sm_mitm = 0;
+// No MITM (not sure what this does yet. on = 1 off = 0)
+// defaults back to legacy if not supported by the device
+    ble_hs_cfg.sm_mitm = 1;
 
 // No input/output capability
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
