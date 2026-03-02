@@ -17,7 +17,7 @@ typedef struct {
 
 
 
-void simulateEdgePacket() { // Fake BLE packet data
+/*void simulateEdgePacket() { // Fake BLE packet data
    
     uint8_t fakePacket[MAX_PAYLOAD] = {0xA5, 0x01, 0x02, 0x03};
     int len = 4;
@@ -29,7 +29,7 @@ void simulateEdgePacket() { // Fake BLE packet data
         Serial.print(" ");
     }
     Serial.println();
-}
+}*/
 
 
 
@@ -145,6 +145,7 @@ void loop() {
       }else{
         last_seq_per_edge[device_id] = seq;
         Serial.println("New event processed"); 
+      }
     }
     //send upstream (towards fog) if ok continue down to send ACK
       
