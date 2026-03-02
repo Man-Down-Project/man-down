@@ -14,8 +14,9 @@
 
 #include "ble_gatt_client.h"
 #include "ble.h"
+#include "edge_protocol.h"
 
-
+static ble_state_t ble_state = BLE_STATE_IDLE;
 // struct ble_gap_adv_params adv_params = {
 //         .conn_mode = BLE_GAP_CONN_MODE_UND,
 //         .disc_mode = BLE_GAP_DISC_MODE_GEN,
@@ -47,6 +48,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
     
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
+            ble_state = BLE_STATE_CONNECTED;
             ESP_LOGI(TAG, "Connected");
 
             current_conn_handle = event->connect.conn_handle;
@@ -58,7 +60,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         break;
 
     case BLE_GAP_EVENT_DISCONNECT:
-        
+        ble_state = BLE_STATE_SCANNING;
         ESP_LOGI(TAG, "Disconnected");
 
         vTaskDelay(pdMS_TO_TICKS(2000));
@@ -84,6 +86,10 @@ static int gap_event(struct ble_gap_event *event, void *arg)
     
     case BLE_GAP_EVENT_DISC_COMPLETE:
     {
+        if (ble_state != BLE_STATE_SCANNING) {
+            break;
+        }
+
         if (best_found) {
             ESP_LOGI(TAG, "Best RSSI: %d ,connecting...",best_rssi);
 
@@ -108,10 +114,11 @@ static int gap_event(struct ble_gap_event *event, void *arg)
     }
     
     case BLE_GAP_EVENT_ENC_CHANGE:
+        gatt_client_reset();
         if (event->enc_change.status == 0) {
+            ble_state = BLE_STATE_DISCOVERING;
             ESP_LOGI(TAG, "Encryption established");
-
-            // här lägger man GATT write (heartbeat/larm)
+            gatt_client_init();
             ble_gattc_disc_all_svcs(current_conn_handle,
                                     gatt_svc_cb,
                                     NULL);
@@ -144,6 +151,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 
 static void ble_app_on_sync(void)
 {
+    ble_state = BLE_STATE_SCANNING;
     int rc;
 
     rc = ble_hs_id_infer_auto(0, &own_addr_type);

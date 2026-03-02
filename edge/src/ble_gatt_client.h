@@ -1,10 +1,14 @@
 #ifndef BLE_GATT_CLIENT_H
 #define BLE_GATT_CLIENT_H
 
+#include "host/ble_hs.h"
+#include "host/ble_gatt.h"
+
 int gatt_svc_cb(uint16_t conn_handle,
                      const struct ble_gatt_error *error,
                      const struct ble_gatt_svc *service,
                      void *arg);
-void send_edge_packet(uint16_t conn_handle);
+void gatt_client_reset();
+void gatt_client_init();
 
 #endif

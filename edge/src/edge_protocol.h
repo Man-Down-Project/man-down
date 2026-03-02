@@ -19,4 +19,13 @@ typedef struct {
     uint8_t current_node;
 }internal_data;
 
+typedef enum {
+    BLE_STATE_IDLE,
+    BLE_STATE_SCANNING,
+    BLE_STATE_CONNECTING,
+    BLE_STATE_CONNECTED,
+    BLE_STATE_DISCOVERING
+} ble_state_t;
+
+
 #endif

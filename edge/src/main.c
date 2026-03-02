@@ -6,6 +6,7 @@
 #include "esp_log.h"
 
 #include "ble.h"
+#include "ble_gatt_client.h"
 
 static const char *TAG = "MAIN";
 
