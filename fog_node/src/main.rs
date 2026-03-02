@@ -1,6 +1,8 @@
 mod events;
+mod mqtt;
 
 use events::{Envelope, Incident};
+use std::time::Duration;
 use tokio::sync::mpsc;
 
 #[tokio::main]
@@ -9,7 +11,7 @@ async fn main() {
 
     let (tx, mut rx) = mpsc::channel::<Envelope>(100);
 
-    let processor = tokio::spawn(async move {
+    tokio::spawn(async move {
         while let Some(env) = rx.recv().await {
             if let Err(e) = env.validate_basic() {
                 log::warn!("Dropped invalid envelope: {}", e);
@@ -20,24 +22,14 @@ async fn main() {
         }
     });
 
-    let raw = r#"
-    {
-    "device_id": "esp32-01",
-    "mesh_node_id": "mesh-01",
-    "seq": 42,
-    "sent_at": "2026-02-26T18:00:00Z",
-    "incident": {
-      "type": "ManDown",
-      "zone_hint": "Zone-A"
-}
-}
-"#;
-    let env: Envelope = serde_json::from_str(raw).expect("Failed to parse Envelope");
-    tx.send(env).await.expect("processor dropped");
+    let mqtt_tx = tx.clone();
+    tokio::spawn(async move {
+        mqtt::start_mqtt_tls(mqtt_tx).await;
+    });
 
-    drop(tx); //stäng av kanalen så prosessorn kan avsluta (demo)
-
-    processor.await.unwrap(); //vänta tills processen blir klar
+    loop {
+        tokio::time::sleep(Duration::from_secs(60)).await;
+    }
 }
 
 async fn process_envelope(env: Envelope) {

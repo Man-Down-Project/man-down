@@ -19,7 +19,6 @@ pub enum Incident {
     Login { worker_id: String },
     Logout { worker_id: String },
     BatteryLow { battery_level: u8 },
-    //fel på sensor-parameter
     SensorFault { fault: SensorFault },
 }
 
