@@ -24,7 +24,9 @@ async fn main() {
 
     let mqtt_tx = tx.clone();
     tokio::spawn(async move {
-        mqtt::start_mqtt_tls(mqtt_tx).await;
+        if let Err(e) = mqtt::start_mqtt_tls(mqtt_tx).await {
+            log::error!("MQTT task exited: {}", e);
+        }
     });
 
     loop {
