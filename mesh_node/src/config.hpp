@@ -4,8 +4,8 @@
 #define NODE_ID 1
 
 //wifi config
-#define WIFI_SSID "Mi Telefon"
-#define WIFI_PASS "kafademapa"
+#define WIFI_SSID "wifi name"
+#define WIFI_PASS "wifi password"
 
 //MQTT config
 #define MQTT_BROKER "ip"
