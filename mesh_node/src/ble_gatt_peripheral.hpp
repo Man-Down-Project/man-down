@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <ArduinoBLE.h>
 
-#define MAX_PAYLOAD 8
+
 #define EVENT_HEARTBEAT  0x00 // only need QoS 0
 
 typedef struct {

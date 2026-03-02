@@ -1,5 +1,5 @@
 #include "ble_gatt_peripheral.hpp"
-
+#include "config.hpp"
 
 BLEService meshService("12345678-1234-1234-1234-123456789abc"); // UUID
 
@@ -15,7 +15,7 @@ BLECharacteristic ackTX(
     2   
 );
 
-static uint8_t last_seq_per_edge[256];
+static uint8_t last_seq_per_edge[MAX_EDGE_DEVICES];
 
 void ble_init(const char* node_name){
 
@@ -64,7 +64,7 @@ void ble_poll(){
 
     Serial.print("Packet from device: ");
     Serial.print(device_id);
-    Serial.print("seq: ");
+    Serial.print(" seq: ");
     Serial.println(seq);
 
     if (pkt->event_type == EVENT_HEARTBEAT){
