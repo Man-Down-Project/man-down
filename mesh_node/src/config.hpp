@@ -1,6 +1,20 @@
-#pragma
+#pragma once
 
+//node config
 #define NODE_ID 1
+
+//wifi config
+#define WIFI_SSID "wifi name"
+#define WIFI_PASS "wifi password"
+
+//MQTT config
+#define MQTT_BROKER "ip"
+#define MQTT_PORT 1883
+
+//Topics
+#define MQTT_TOPIC_EVENT "mesh/edge_event"
+
+//System limits
 #define MAX_PAYLOAD 8
 #define MAX_NEIGHBORS 5
 #define MAX_APPROVED_EDGE 10

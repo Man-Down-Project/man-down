@@ -1,5 +1,7 @@
 #include "ble_gatt_peripheral.hpp"
 #include "config.hpp"
+#include "mqtt_client.hpp"
+#include "edge_event.hpp"
 
 BLEService meshService("12345678-1234-1234-1234-123456789abc"); // UUID
 
@@ -79,8 +81,12 @@ void ble_poll(){
         Serial.println("New event processed"); 
       }
     }
-    //send upstream (towards fog) if ok continue down to send ACK
-      
+    bool ok = mqtt_publisher_edge_event(pkt);
+      if (!ok){
+        Serial.println("MQTT publish failed");
+        return;
+      }  
+
     uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
     ackTX.writeValue(ack, 2);
     Serial.println("ACK sent");
