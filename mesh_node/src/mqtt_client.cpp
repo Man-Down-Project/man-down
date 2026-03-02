@@ -44,7 +44,7 @@ void mqtt_init() {
 bool mqtt_publisher_edge_event(edge_event_t* pkt) {
     return mqttClient.publish(
         topic,
-        (uint8_t*)pkt,
+        (uint16_t*)pkt,
         sizeof(edge_event_t)
     );
 }
