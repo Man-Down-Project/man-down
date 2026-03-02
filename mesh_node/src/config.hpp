@@ -9,7 +9,7 @@
 
 //MQTT config
 #define MQTT_BROKER "ip"
-#define MQTT_PORT 1883
+#define MQTT_PORT 8883
 
 //Topics
 #define MQTT_TOPIC_EVENT "mesh/edge_event"
