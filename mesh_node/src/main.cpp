@@ -152,6 +152,7 @@ void loop() {
     uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
     ackTX.writeValue(ack, 2);
     Serial.println("ACK sent");
+    Serial.println(pkt->device_id);
     
   }
 }
