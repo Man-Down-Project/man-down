@@ -235,3 +235,8 @@ void gatt_client_init()
     ble_uuid_from_str(&ack_tx_uuid,
                       "11111111-2222-3333-4444-555555555555");
 }
+
+const ble_uuid_t *gatt_get_service_uuid()
+{
+    return &target_service_uuid.u;
+}

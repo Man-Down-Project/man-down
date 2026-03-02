@@ -72,23 +72,45 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         break;
 
     case BLE_GAP_EVENT_DISC:
+        struct ble_hs_adv_fields fields;
+        
         
         struct ble_gap_disc_desc *desc = &event->disc;
+        int rc = ble_hs_adv_parse_fields(&fields,
+                                         desc->data,
+                                         desc->length_data);
+        char uuid_str[BLE_UUID_STR_LEN];
+        // char target_str[BLE_UUID_STR_LEN];
 
-        ESP_LOGI(TAG, "Found device RSSI: %d", desc->rssi);
+        // ble_uuid_to_str(gatt_get_service_uuid(), target_str);
+        // ESP_LOGI(TAG, "Target UUID: %s", target_str);
 
-        if (desc->rssi > best_rssi) {
-            best_rssi = desc->rssi;
-            best_addr = desc->addr;
-            best_found = 1;
+        // if (rc == 0 && fields.uuids128 != NULL) {
+        //     for (int i = 0; i < fields.num_uuids128; i++) {
+        //         ble_uuid_to_str(&fields.uuids128[i].u, uuid_str);
+        //         ESP_LOGI(TAG, "Advertised UUID: %s", uuid_str);
+        //     }
+        // }
+        if (rc == 0 && fields.uuids128 != NULL) {
+            for (int i = 0; i < fields.num_uuids128; i++) {
+                if (ble_uuid_cmp(&fields.uuids128[i].u, gatt_get_service_uuid()) == 0) {
+                    ESP_LOGI(TAG, "Found device RSSI: %d", desc->rssi);
+
+                    if (desc->rssi > best_rssi) {
+                    best_rssi = desc->rssi;
+                    best_addr = desc->addr;
+                    best_found = 1;
+
+                    }
+                }
+            }
+
+        
         }
         break;
     
     case BLE_GAP_EVENT_DISC_COMPLETE:
     {
-        if (ble_state != BLE_STATE_SCANNING) {
-            break;
-        }
 
         if (best_found) {
             ESP_LOGI(TAG, "Best RSSI: %d ,connecting...",best_rssi);
@@ -104,6 +126,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         } else {
             ESP_LOGI(TAG, "No device found, rescanning");
 
+            ble_state = BLE_STATE_SCANNING;
+
             ble_gap_disc(own_addr_type,
                          300,
                          &scan_params,
@@ -118,7 +142,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         if (event->enc_change.status == 0) {
             ble_state = BLE_STATE_DISCOVERING;
             ESP_LOGI(TAG, "Encryption established");
-            gatt_client_init();
+            //gatt_client_init();
             ble_gattc_disc_all_svcs(current_conn_handle,
                                     gatt_svc_cb,
                                     NULL);
@@ -206,6 +230,7 @@ void ble_init()
     ESP_ERROR_CHECK(esp_nimble_init());
     ESP_LOGI(TAG, "Initializing NimBLE...");
 
+    gatt_client_init();
     nimble_port_init();
 
     ble_svc_gap_init();

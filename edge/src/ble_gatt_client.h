@@ -10,5 +10,6 @@ int gatt_svc_cb(uint16_t conn_handle,
                      void *arg);
 void gatt_client_reset();
 void gatt_client_init();
+const ble_uuid_t *gatt_get_service_uuid();
 
 #endif
