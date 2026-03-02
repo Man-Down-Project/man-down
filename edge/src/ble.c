@@ -212,9 +212,9 @@ void ble_init()
 // Enable bonding (store keys in NVS)
     ble_hs_cfg.sm_bonding = 1;
 
-// No MITM (not sure what this does yet. on = 1 off = 0)
+// No MITM (not sure what this does yet. guessing on = 1 off = 0)
 // defaults back to legacy if not supported by the device
-    ble_hs_cfg.sm_mitm = 1;
+    ble_hs_cfg.sm_mitm = 0;
 
 // No input/output capability
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;

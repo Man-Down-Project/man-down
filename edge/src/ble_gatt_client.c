@@ -88,19 +88,19 @@ static int gatt_chr_cb(uint16_t conn_handle,
         ESP_LOGI(TAG, "Characteristic discovery complete");
 
         if (target_char_handle != 0) {
-            const char *msg = "HEARTBEAT"; // just here for testing
+            //const char *msg = "HEARTBEAT"; // just here for testing
             ble_gattc_disc_all_dscs(conn_handle,
-                                chr->val_handle,
+                                target_char_handle,
                                 service_end_handle,
                                 gatt_dsc_cb,
                                 NULL);
 
-            ble_gattc_write_flat(conn_handle,
-                                target_char_handle,
-                                msg,
-                                strlen(msg),
-                                gatt_write_cb,
-                                NULL);
+            // ble_gattc_write_flat(conn_handle,
+            //                     target_char_handle,
+            //                     msg,
+            //                     strlen(msg),
+            //                     gatt_write_cb,
+            //                     NULL);
         } else {
             ESP_LOGE(TAG, "Target characteristic not found!");
         }
