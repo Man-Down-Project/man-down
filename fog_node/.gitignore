@@ -1,4 +1,10 @@
 target/
 certs/
 mosquitto-dev.conf
+.env
+.DS_Store
+*.log
 
+# Backup files
+*.bak
+*.swp
