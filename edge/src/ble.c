@@ -32,6 +32,13 @@ struct ble_gap_disc_params scan_params = {
 static const char *TAG = "BLE";
 static uint8_t own_addr_type;
 
+// variables to handle retry if encryption failed
+static uint8_t enc_fail_count = 0;
+static uint32_t reconnect_delay_ms = 2000;
+
+#define RECONNECT_DELAY_MIN 2000
+#define RECONNECT_DELAY_MAX 30000
+
 // varibles used for best RSSI pick
 static int best_rssi = -127;
 static ble_addr_t best_addr;
@@ -48,12 +55,17 @@ static int gap_event(struct ble_gap_event *event, void *arg)
     
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
+            
             ble_state = BLE_STATE_CONNECTED;
             ESP_LOGI(TAG, "Connected");
-
+            struct ble_gap_conn_desc desc;
             current_conn_handle = event->connect.conn_handle;
+            
+            ble_gap_conn_find(event->connect.conn_handle, &desc);
+            ESP_LOGI(TAG, "Bonded: %d", desc.sec_state.bonded);
 
             ble_gap_security_initiate(current_conn_handle);
+            
         } else {
             ESP_LOGE(TAG, "Connection failed");
         }
@@ -63,7 +75,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         ble_state = BLE_STATE_SCANNING;
         ESP_LOGI(TAG, "Disconnected");
 
-        vTaskDelay(pdMS_TO_TICKS(2000));
+        vTaskDelay(pdMS_TO_TICKS(reconnect_delay_ms));
+        
         ble_gap_disc(own_addr_type,
                      300, 
                      &scan_params,
@@ -72,6 +85,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         break;
 
     case BLE_GAP_EVENT_DISC:
+        
         struct ble_hs_adv_fields fields;
         
         
@@ -138,16 +152,34 @@ static int gap_event(struct ble_gap_event *event, void *arg)
     }
     
     case BLE_GAP_EVENT_ENC_CHANGE:
+        ESP_LOGI(TAG, "enc status=%d", event->enc_change.status);
         gatt_client_reset();
         if (event->enc_change.status == 0) {
+            
+            enc_fail_count = 0;
+            reconnect_delay_ms = RECONNECT_DELAY_MIN;
+
             ble_state = BLE_STATE_DISCOVERING;
             ESP_LOGI(TAG, "Encryption established");
-            //gatt_client_init();
+
             ble_gattc_disc_all_svcs(current_conn_handle,
                                     gatt_svc_cb,
                                     NULL);
         } else {
             ESP_LOGE(TAG, "Encryption failed");
+            enc_fail_count++;
+
+            reconnect_delay_ms = RECONNECT_DELAY_MIN << enc_fail_count;
+
+            if (reconnect_delay_ms > RECONNECT_DELAY_MAX) {
+                reconnect_delay_ms = RECONNECT_DELAY_MAX;
+            }
+
+            ESP_LOGW(TAG, "Retry in %lu ms (fail count=%d)",
+                     reconnect_delay_ms, enc_fail_count);
+            
+                     ble_gap_terminate(current_conn_handle,
+                                       BLE_ERR_REM_USER_CONN_TERM);
         }
         break;
 
@@ -243,7 +275,7 @@ void ble_init()
     ble_hs_cfg.sm_sc = 1;
 
 // Enable bonding (store keys in NVS)
-    ble_hs_cfg.sm_bonding = 1;
+    ble_hs_cfg.sm_bonding = 0;
 
 // No MITM (not sure what this does yet. guessing on = 1 off = 0)
 // defaults back to legacy if not supported by the device
