@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -e
+
+mkdir -p certs
+cd certs
+
+echo "Generating CA..."
+openssl req -x509 -new -nodes -days 365 \
+  -subj "/CN=Fog-CA" \
+  -keyout ca.key -out ca.crt
+
+echo "Generating server certificate..."
+openssl req -newkey rsa:2048 -nodes \
+  -subj "/CN=localhost" \
+  -keyout server.key -out server.csr
+
+openssl x509 -req -in server.csr \
+  -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -out server.crt -days 365
+
+echo "Generating fog client certificate..."
+openssl req -newkey rsa:2048 -nodes \
+  -subj "/CN=fog-client" \
+  -keyout fog.key -out fog.csr
+
+openssl x509 -req -in fog.csr \
+  -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -out fog.crt -days 365
+
+rm *.csr *.srl
+
+echo "Certificates generated successfully."

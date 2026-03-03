@@ -1,10 +1,20 @@
+# Rust build output
 target/
+
+# Local certificates
 certs/
-mosquitto-dev.conf
+
+# Local configuration
 .env
-.DS_Store
+mosquitto-dev.conf
+
+# Logs
 *.log
 
-# Backup files
+# OS files
+.DS_Store
+
+# Backup / editor files
 *.bak
 *.swp
+*~
