@@ -2,36 +2,51 @@ mod events;
 mod mqtt;
 
 use events::{Envelope, Incident};
-use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 #[tokio::main]
 async fn main() {
+    let _ = dotenvy::dotenv();
     env_logger::init();
 
     let (tx, mut rx) = mpsc::channel::<Envelope>(100);
 
-    tokio::spawn(async move {
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    let processor = tokio::spawn(async move {
         while let Some(env) = rx.recv().await {
             if let Err(e) = env.validate_basic() {
                 log::warn!("Dropped invalid envelope: {}", e);
                 continue;
             }
-
             process_envelope(env).await;
         }
+        log::info!("Processor: channel closed, exiting");
     });
 
-    let mqtt_tx = tx.clone();
-    tokio::spawn(async move {
-        if let Err(e) = mqtt::start_mqtt_tls(mqtt_tx).await {
-            log::error!("MQTT task exited: {}", e);
+    let mqtt_task = tokio::spawn({
+        let mqtt_tx = tx.clone();
+        let shutdown_rx = shutdown_rx.clone();
+        async move {
+            if let Err(e) = mqtt::start_mqtt_tls(mqtt_tx, shutdown_rx).await {
+                log::error!("MQTT task exited with error: {}", e);
+            }
         }
     });
 
-    loop {
-        tokio::time::sleep(Duration::from_secs(60)).await;
+    if let Err(e) = tokio::signal::ctrl_c().await {
+        log::error!("Failed to listen for Ctrl+C: {}", e);
     }
+
+    log::info!("Ctrl+C received, shutting down...");
+    let _ = shutdown_tx.send(true);
+
+    drop(tx);
+
+    let _ = mqtt_task.await;
+    let _ = processor.await;
+
+    log::info!("Shutdown complete");
 }
 
 async fn process_envelope(env: Envelope) {
