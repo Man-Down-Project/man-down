@@ -23,3 +23,5 @@ env_logger = "0.10"
 
 # Async
 tokio = { version = "1", features = ["full"] }
+
+dotenvy = "0.15"
