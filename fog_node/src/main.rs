@@ -9,6 +9,8 @@ async fn main() {
     let _ = dotenvy::dotenv();
     env_logger::init();
 
+    log::info!("MQTT_HOST = {:?}", std::env::var("MQTT_HOST"));
+
     let (tx, mut rx) = mpsc::channel::<Envelope>(100);
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
