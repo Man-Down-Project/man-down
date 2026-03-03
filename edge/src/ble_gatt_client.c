@@ -9,8 +9,9 @@
 #include "host/ble_uuid.h"
 
 #include "ble.h"
-#include "edge_protocol.h"
+//#include "edge_config.h"
 
+// Service UUID etc
 static ble_uuid_any_t target_service_uuid;
 static ble_uuid_any_t event_rx_uuid;
 static ble_uuid_any_t ack_tx_uuid;
@@ -143,8 +144,8 @@ static int gatt_write_cb(uint16_t conn_handle,
     }
 
     // Efter write  så disconnectar edge från mesh-nod
-    ble_gap_terminate(conn_handle,
-                      BLE_ERR_REM_USER_CONN_TERM);
+    // ble_gap_terminate(conn_handle,
+    //                   BLE_ERR_REM_USER_CONN_TERM);
     
     return 0;
 }
@@ -182,38 +183,12 @@ static int subscribe_cb(uint16_t conn_handle,
         ESP_LOGI(TAG, "Notifications enabled");
 
         // Write event packet after subscribing to ackTX
-        send_edge_packet(conn_handle);
+        ble_on_ready(conn_handle);
     } else {
         ESP_LOGE(TAG, "Failed to enable notify");
     }
+    
     return 0;
-}
-
-void send_edge_packet(uint16_t conn_handle)
-{
-    if (event_char_handle == 0) {
-        ESP_LOGE(TAG, "Characteristic handle not set");
-        return;
-    }
-    edge_event_t packet;
-
-    packet.device_id        = 137;            // example
-    packet.event_type       = 0x00;         // heartbeat
-    packet.event_location   = 2;            // example location
-    packet.battery_status   = 95;           // levels in %
-    packet.seq              = 1 + sequence_counter++;
-
-    int rc = ble_gattc_write_flat(conn_handle,
-                                  event_char_handle,
-                                  &packet,
-                                  sizeof(packet),
-                                  gatt_write_cb,
-                                  NULL);
-    if (rc != 0) {
-        ESP_LOGE(TAG, "Write failed: %d, rc");
-    } else {
-        ESP_LOGI(TAG, "Packet sent (seq=%d)", packet.seq);
-    }
 }
 
 void gatt_client_reset()
@@ -239,4 +214,34 @@ void gatt_client_init()
 const ble_uuid_t *gatt_get_service_uuid()
 {
     return &target_service_uuid.u;
+}
+
+int gatt_send_event(uint16_t conn_handle, edge_event_t *event)
+{
+    if (event_char_handle == 0)
+    {
+        ESP_LOGE(TAG, "Characteristic handle not set");
+        return -1;
+    }
+
+    if (conn_handle == BLE_HS_CONN_HANDLE_NONE) 
+    {
+        ESP_LOGE(TAG, "No active connection");
+        return -1;
+    }
+
+    int rc = ble_gattc_write_flat(conn_handle,
+                                  event_char_handle,
+                                  event,
+                                  sizeof(edge_event_t),
+                                  gatt_write_cb,
+                                  NULL);
+    
+    if (rc != 0)
+    {
+        ESP_LOGE(TAG, "Write failed: %d", rc);
+        return rc;
+    }
+    ESP_LOGI(TAG, "Event sent");
+    return 0;
 }

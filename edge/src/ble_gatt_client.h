@@ -3,6 +3,7 @@
 
 #include "host/ble_hs.h"
 #include "host/ble_gatt.h"
+#include "edge_config.h"
 
 int gatt_svc_cb(uint16_t conn_handle,
                      const struct ble_gatt_error *error,
@@ -10,6 +11,7 @@ int gatt_svc_cb(uint16_t conn_handle,
                      void *arg);
 void gatt_client_reset();
 void gatt_client_init();
+int gatt_send_event(uint16_t conn_handle, const edge_event_t *event);
 const ble_uuid_t *gatt_get_service_uuid();
 
 #endif

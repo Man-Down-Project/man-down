@@ -7,28 +7,13 @@
 
 #include "ble.h"
 #include "ble_gatt_client.h"
+#include "edge_config.h"
 
 static const char *TAG = "MAIN";
 
 #define BUTTON_GPIO 10 // Button pin
 #define BUZZER_GPIO 12 // Buzzer pin
 #define Accelerometer_GPIO 22 //Accelerometer pin
-
-typedef struct { // external comunication
-    uint8_t device_id;
-    uint8_t event_type;
-    uint8_t event_location;
-    uint8_t battery_status;
-    uint8_t seq;
-}edge_event_t;
-
-typedef struct {
-    uint8_t accelerometer;
-    uint8_t last_location;
-    uint8_t current_node;
-}internal_data;
-
-
 
 void app_main(void)
 {

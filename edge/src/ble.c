@@ -11,16 +11,27 @@
 #include "esp_bt.h"
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
+#include "freertos/queue.h"
+#include "freertos/timers.h"
 
 #include "ble_gatt_client.h"
 #include "ble.h"
-#include "edge_protocol.h"
+#include "edge_config.h"
 
-static ble_state_t ble_state = BLE_STATE_IDLE;
-// struct ble_gap_adv_params adv_params = {
-//         .conn_mode = BLE_GAP_CONN_MODE_UND,
-//         .disc_mode = BLE_GAP_DISC_MODE_GEN,
-// };
+// func declaration
+static void ble_tx_task(void *arg);
+static void heartbeat_timer_cb(TimerHandle_t xTimer);
+//void ble_send_event(const edge_event_t *event);
+
+
+// queue variables
+static edge_event_t pending_event;
+static bool event_pending = false;
+// RTOS task queue variables
+static QueueHandle_t ble_tx_queue;
+static TimerHandle_t heartbeat_timer;
+
+ble_state_t ble_state = BLE_STATE_IDLE;
 struct ble_gap_disc_params scan_params = {
         .itvl = 0x50,
         .window = 0x30,
@@ -72,39 +83,37 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         break;
 
     case BLE_GAP_EVENT_DISCONNECT:
-        ble_state = BLE_STATE_SCANNING;
+        
+        current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        
         ESP_LOGI(TAG, "Disconnected");
 
-        vTaskDelay(pdMS_TO_TICKS(reconnect_delay_ms));
+        if (enc_fail_count > 0)
+        {
+            vTaskDelay(pdMS_TO_TICKS(reconnect_delay_ms));
+
+            ble_state = BLE_STATE_SCANNING;
         
-        ble_gap_disc(own_addr_type,
-                     300, 
-                     &scan_params,
-                     gap_event,
-                     NULL);
+            ble_gap_disc(own_addr_type,
+                        300, 
+                        &scan_params,
+                        gap_event,
+                        NULL);
+        } else {
+            ble_state = BLE_STATE_IDLE;
+        }
         break;
 
     case BLE_GAP_EVENT_DISC:
         
         struct ble_hs_adv_fields fields;
         
-        
         struct ble_gap_disc_desc *desc = &event->disc;
         int rc = ble_hs_adv_parse_fields(&fields,
                                          desc->data,
                                          desc->length_data);
         char uuid_str[BLE_UUID_STR_LEN];
-        // char target_str[BLE_UUID_STR_LEN];
-
-        // ble_uuid_to_str(gatt_get_service_uuid(), target_str);
-        // ESP_LOGI(TAG, "Target UUID: %s", target_str);
-
-        // if (rc == 0 && fields.uuids128 != NULL) {
-        //     for (int i = 0; i < fields.num_uuids128; i++) {
-        //         ble_uuid_to_str(&fields.uuids128[i].u, uuid_str);
-        //         ESP_LOGI(TAG, "Advertised UUID: %s", uuid_str);
-        //     }
-        // }
+        
         if (rc == 0 && fields.uuids128 != NULL) {
             for (int i = 0; i < fields.num_uuids128; i++) {
                 if (ble_uuid_cmp(&fields.uuids128[i].u, gatt_get_service_uuid()) == 0) {
@@ -138,15 +147,14 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             best_rssi = -127;
             best_found = 0;
         } else {
-            ESP_LOGI(TAG, "No device found, rescanning");
-
-            ble_state = BLE_STATE_SCANNING;
-
+            ESP_LOGI(TAG, "No device found, retrying scan");
             ble_gap_disc(own_addr_type,
-                         300,
+                         500,
                          &scan_params,
                          gap_event,
                          NULL);
+            //ble_state = BLE_STATE_IDLE;
+
         }
         break;
     }
@@ -169,6 +177,13 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGE(TAG, "Encryption failed");
             enc_fail_count++;
 
+            if (enc_fail_count > 5) 
+            {
+                ESP_LOGE(TAG, "Too many encryption failures, giving up...");
+                ble_state = BLE_STATE_IDLE;
+                break;
+            }
+
             reconnect_delay_ms = RECONNECT_DELAY_MIN << enc_fail_count;
 
             if (reconnect_delay_ms > RECONNECT_DELAY_MAX) {
@@ -178,8 +193,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGW(TAG, "Retry in %lu ms (fail count=%d)",
                      reconnect_delay_ms, enc_fail_count);
             
-                     ble_gap_terminate(current_conn_handle,
-                                       BLE_ERR_REM_USER_CONN_TERM);
+            ble_gap_terminate(current_conn_handle,
+                              BLE_ERR_REM_USER_CONN_TERM);
         }
         break;
 
@@ -195,6 +210,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         os_mbuf_copydata(om, 0, len, data);
 
         ESP_LOGI(TAG, "ACK seq=%d status =%d", data[0], data[1]);
+        ble_gap_terminate(current_conn_handle,
+                      BLE_ERR_REM_USER_CONN_TERM);
 
         break;
     }
@@ -207,29 +224,21 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 
 static void ble_app_on_sync(void)
 {
-    ble_state = BLE_STATE_SCANNING;
+    
     int rc;
 
     rc = ble_hs_id_infer_auto(0, &own_addr_type);
-
     if (rc != 0) {
         ESP_LOGE(TAG, "Address infer failed");
         return;
     }
 
-    rc = ble_gap_disc(own_addr_type,
-                      300,
-                      &scan_params,
-                      gap_event,
-                      NULL);
-    
-    
-    if (rc != 0) {
-        ESP_LOGE(TAG, "Scan start failed:: %d", rc);
-        return;
-    } else {
-        ESP_LOGI(TAG, "Scanning started");
+    ble_state = BLE_STATE_IDLE;
+
+    if (heartbeat_timer != NULL) {
+        xTimerStart(heartbeat_timer, 0);
     }
+    ESP_LOGI(TAG, "BLE stack synchronized");
 }
 
 static void ble_host_task(void *param)
@@ -251,22 +260,21 @@ void ble_init()
         ESP_ERROR_CHECK(nvs_flash_erase());
         ESP_ERROR_CHECK(nvs_flash_init());
     }
+    // ESP_ERROR_CHECK(
+    //     esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT)
+    // );
 
-
-    ESP_LOGI(TAG, "Initializing Bluetooth Controller");
-
-    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
-    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
-
-    ESP_ERROR_CHECK(esp_nimble_init());
     ESP_LOGI(TAG, "Initializing NimBLE...");
-
-    gatt_client_init();
+    //ESP_ERROR_CHECK(esp_nimble_init());
+    // esp_err_t err = esp_nimble_init();
+    // ESP_LOGI(TAG, "esp_nimble_init returned %d", err);
     nimble_port_init();
-
+    
+    
+    
     ble_svc_gap_init();
     ble_svc_gatt_init();
+    gatt_client_init();
 
     ble_svc_gap_device_name_set("H2_EDGE");
 
@@ -287,7 +295,102 @@ void ble_init()
 // Key distribution
     ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC;
     ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC;
+    // =======================================
+    //             START QUEUE + TASK
+    // =======================================
+    
+    ble_tx_queue = xQueueCreate(5, sizeof(ble_tx_msg_t));
+    if (ble_tx_queue == NULL) {
+        ESP_LOGE(TAG, "Failed to create TX queue");
+    }
+    xTaskCreate(ble_tx_task,
+                "ble_tx",
+                4096,
+                NULL,
+                5,
+                NULL);
+    
+    heartbeat_timer = xTimerCreate("hb",
+                                   pdMS_TO_TICKS(HEART_TIMER),
+                                   pdTRUE,
+                                   NULL,
+                                   heartbeat_timer_cb);
+    
 
+    // ========================================
+    // Start NimBLE host task (need to be last)
+    // ========================================
     nimble_port_freertos_init(ble_host_task);
 }
 
+uint16_t ble_get_conn_handle()
+{
+    return current_conn_handle;
+}
+
+void ble_send_event(const edge_event_t *event)
+{
+    ble_tx_msg_t msg;
+    msg.event = *event;
+
+    xQueueSend(ble_tx_queue, &msg, 0);
+}
+
+static void ble_tx_task(void *arg)
+{
+    ble_tx_msg_t msg;
+
+    while(1) {
+        if (xQueueReceive(ble_tx_queue, &msg, portMAX_DELAY)) 
+        {
+            ESP_LOGI(TAG, "TX requested");
+            
+            while (!ble_hs_is_enabled())
+            {
+                vTaskDelay(pdMS_TO_TICKS(100));
+            }
+            // Start scan if idle
+            if (ble_state == BLE_STATE_IDLE)
+            {
+                ESP_LOGI(TAG, "Starting scan");
+                ble_state = BLE_STATE_SCANNING;
+
+                ble_gap_disc(own_addr_type,
+                             500,
+                            &scan_params,
+                            gap_event,
+                            NULL);
+            }
+
+            while (ble_state != BLE_STATE_READY)
+            {
+                vTaskDelay(pdMS_TO_TICKS(50));
+            }
+            gatt_send_event(current_conn_handle, &msg.event);
+        }
+    }
+}
+
+static void heartbeat_timer_cb(TimerHandle_t xTimer)
+{
+    edge_event_t event;
+
+    event.device_id = 123;
+    event.event_type = EVENT_HEARTBEAT;
+    event.event_location = 0;
+    event.battery_status = BATTERY_STATUS; // Should make a func to gather battery info (don't think we have adapter for battery power)
+    event.seq = 0;
+
+    ble_send_event(&event);
+}
+
+void ble_on_ready(uint16_t conn_handle)
+{
+    ble_state = BLE_STATE_READY;
+
+    if(event_pending)
+    {
+        gatt_send_event(conn_handle, &pending_event);
+        event_pending = false;
+    }
+}
