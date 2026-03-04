@@ -12,7 +12,7 @@ PubSubClient mqttClient(wifiClient);
 const char* broker = MQTT_BROKER;
 const int port = 1883;
 
-char topic[64];
+char topic[MAX_TOPIC_SIZE];
 
 void mqtt_init() {
 
@@ -44,7 +44,7 @@ void mqtt_init() {
 bool mqtt_publisher_edge_event(edge_event_t* pkt) {
     return mqttClient.publish(
         topic,
-        (uint16_t*)pkt,
+        (uint8_t*)pkt,
         sizeof(edge_event_t)
     );
 }

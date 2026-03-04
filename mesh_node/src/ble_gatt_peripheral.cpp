@@ -1,7 +1,10 @@
+#include <SHA256.h>
+#include <string.h>
 #include "ble_gatt_peripheral.hpp"
 #include "config.hpp"
 #include "mqtt_client.hpp"
 #include "edge_event.hpp"
+#include "auth_node.hpp"
 
 BLEService meshService("12345678-1234-1234-1234-123456789abc"); // UUID
 
@@ -14,14 +17,16 @@ BLECharacteristic eventRX(
 BLECharacteristic ackTX(
     "11111111-2222-3333-4444-555555555555",
     BLENotify,
-    2   
+    BLE_ACK_SIZE   
 );
 
 static uint8_t last_seq_per_edge[MAX_EDGE_DEVICES];
 
+//AuthNode authNode;
+
 void ble_init(const char* node_name){
 
-    for (int i = 0; i < 256; i++){
+    for (int i = 0; i < MAX_EDGE_DEVICES; i++){
     last_seq_per_edge[i] = 0xFF;
   }
 
@@ -30,7 +35,7 @@ void ble_init(const char* node_name){
     while (1);
   }
 
-  BLE.setLocalName("Node_1");
+  BLE.setLocalName(node_name);
   BLE.setAdvertisedService(meshService);
 
   meshService.addCharacteristic(eventRX);
@@ -41,34 +46,54 @@ void ble_init(const char* node_name){
   Serial.println("Node BLE ready");
 }
 
-void ble_poll(){
+
+void ble_poll(AuthNode &auth){
     BLE.poll();
-      if (eventRX.written()){
     
-    uint8_t buf[MAX_PAYLOAD];
+    if (!eventRX.written()) return;
+    
+    uint8_t buf[sizeof(edge_event_t)];
     int len = eventRX.valueLength();
     eventRX.readValue(buf, len);
     
-    if (len < sizeof (edge_event_t)) {
+    if (len != sizeof (edge_event_t)) {
       Serial.println("Invalid packet size");
       return;
     }
 
     edge_event_t* pkt = (edge_event_t*)buf;
-
     uint8_t device_id = pkt->device_id;
     uint8_t seq = pkt->seq;
 
-    if (device_id >=256){
+    if (device_id >= MAX_EDGE_DEVICES){
       Serial.println("Invalid device_id");
       return;
     }
+
+    //uint8_t* shared_key = _authorized_edges[device_id].shared_key;
 
     Serial.print("Packet from device: ");
     Serial.print(device_id);
     Serial.print(" seq: ");
     Serial.println(seq);
 
+    bool valid = auth.validateEdge(pkt);
+    
+if (!valid) {
+  Serial.println("Unauthorized ore duplicate event");
+  uint8_t nack[BLE_ACK_SIZE] = { seq, 0x00 };
+  ackTX.writeValue(nack, BLE_ACK_SIZE);
+  return;
+}
+
+Serial.println("New event processed");
+bool ok = mqtt_publisher_edge_event(pkt);
+if (!ok){
+  Serial.println("MQTT publish failed");
+  return;
+}
+
+    /*
     if (pkt->event_type == EVENT_HEARTBEAT){
       Serial.println("Heartbeat");
       
@@ -86,10 +111,9 @@ void ble_poll(){
         Serial.println("MQTT publish failed");
         return;
       }  
-
-    uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
-    ackTX.writeValue(ack, 2);
-    Serial.println("ACK sent");
-    Serial.println(pkt->device_id);
-  }
+    */
+  uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
+  ackTX.writeValue(ack, 2);
+  Serial.println("ACK sent");
+  //Serial.println(pkt->device_id);
 }

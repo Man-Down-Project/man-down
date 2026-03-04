@@ -16,6 +16,11 @@
 
 //System limits
 #define MAX_PAYLOAD 8
+#define AUTH_TAG_LEN 8 // unneccesary?
+#define KEY_LEN 16
+#define EEPROM_START 0
+#define MAX_TOPIC_SIZE 64
+
 #define MAX_NEIGHBORS 5
 #define MAX_APPROVED_EDGE 10
 #define MAX_EDGE_DEVICES 256
