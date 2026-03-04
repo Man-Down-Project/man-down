@@ -42,10 +42,17 @@ void mqtt_init() {
 }
 
 bool mqtt_publisher_edge_event(edge_event_t* pkt) {
+    edge_event_out msg = {
+        pkt->device_id,
+        pkt->event_type,
+        pkt->location,
+        pkt->battery,
+        pkt->seq
+    };
     return mqttClient.publish(
         topic,
-        (uint8_t*)pkt,
-        sizeof(edge_event_t)
+        (uint8_t*)&msg,
+        sizeof(msg)
     );
 }
 
