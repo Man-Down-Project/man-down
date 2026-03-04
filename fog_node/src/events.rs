@@ -70,25 +70,26 @@ pub struct EdgeEvent {
     pub event_type: u8,
     pub location: u8,
     pub battery: u8,
-    pub seq: u8,
-    pub auth_tag: [u8; 8],
+    pub seq: u64,
 }
 
 impl EdgeEvent {
-    pub const LEN: usize = 13;
+    pub const LEN: usize = 12;
 
     pub fn from_bytes(b: &[u8]) -> Option<Self> {
         if b.len() != Self::LEN {
             return None;
         }
 
+        let seq_bytes: [u8; 8] = b[4..12].try_into().ok()?;
+        let seq = u64::from_le_bytes(seq_bytes);
+
         Some(Self {
             device_id: b[0],
             event_type: b[1],
             location: b[2],
             battery: b[3],
-            seq: b[4],
-            auth_tag: b[5..13].try_into().ok()?,
+            seq,
         })
     }
 
@@ -108,7 +109,6 @@ impl EdgeEvent {
             0x03 => Incident::BatteryLow {
                 battery_level: self.battery,
             },
-            0x04 => Incident::MeshDisconnect { duration_s: 0 },
             _ => Incident::SensorFault {
                 fault: SensorFault {
                     sensor: SensorType::Unknown,
@@ -125,7 +125,7 @@ impl EdgeEvent {
         Envelope {
             device_id,
             mesh_node_id,
-            seq: self.seq as u64,
+            seq: self.seq,
             sent_at: Utc::now(),
             incident,
         }

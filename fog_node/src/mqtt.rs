@@ -134,6 +134,13 @@ async fn run_once(
                 let ev = ev?;
                 if let Event::Incoming(Packet::Publish(p)) = ev {
 
+                    log::info!(
+                        "MQTT: received topic={} len={} bytes={:02x?}",
+                        p.topic,
+                        p.payload.len(),
+                        &p.payload
+                    );
+
                     if let Some(edge) = EdgeEvent::from_bytes(&p.payload){
                         let env = edge.to_envelope("mesh-unknown".to_string());
                         tx.send(env).await?;
