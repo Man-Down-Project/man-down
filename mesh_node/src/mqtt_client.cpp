@@ -6,6 +6,8 @@
 #include "mqtt_client.hpp"
 #include "config.hpp"
 
+
+
 WiFiClient wifiClient;
 PubSubClient mqttClient(wifiClient);
 
@@ -14,34 +16,59 @@ const int port = 1883;
 
 char topic[MAX_TOPIC_SIZE];
 
+static unsigned long lastWifiAttempt = 0;
+static unsigned long lastMQTTAttempt = 0;
+
+#define WIFI_RETRY_INTERVAL 5000
+#define MQTT_RETRY_INTERVAL 5000
+
 void mqtt_init() {
 
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-    while (WiFi.status() != WL_CONNECTED){
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println("WiFi connected");
-
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-
-    while (!mqttClient.connected()) {
-        Serial.print("Connecting MQTT..");
-
-        if (mqttClient.connect("node_client")) {
-            Serial.println("connected");
-        }else{
-            Serial.print("failed ");
-            Serial.println(mqttClient.state());
-            delay(2000);
-        }
-    }
-
     snprintf(topic, sizeof(topic), "mesh/node/%d/edge", my_node.node_id);
 }
 
+void mqtt_handle_wifi() {
+
+    if (WiFi.status() == WL_CONNECTED) 
+        return;
+
+    if (millis() - lastWifiAttempt < WIFI_RETRY_INTERVAL)
+        return;
+    
+    lastWifiAttempt = millis();
+
+    Serial.println("Connecting Wifi...");
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
+void mqtt_handle_connection() {
+
+    if (WiFi.status() != WL_CONNECTED) 
+        return;
+
+    if (mqttClient.connected())
+        return;
+
+    if (millis() - lastMQTTAttempt < MQTT_RETRY_INTERVAL)
+        return;
+
+    lastMQTTAttempt = millis();
+    Serial.println("Connecting MQTT...");
+
+    if (mqttClient.connect("node_client")) {
+        Serial.println("MQTT connected");
+    }else{
+        Serial.print("MQTT failed: ");
+        Serial.println(mqttClient.state());
+    }
+}
+
 bool mqtt_publisher_edge_event(edge_event_t* pkt) {
+
+    if (!mqttClient.connected())
+        return false;
+
     edge_event_out msg = {
         pkt->device_id,
         pkt->event_type,
@@ -57,5 +84,10 @@ bool mqtt_publisher_edge_event(edge_event_t* pkt) {
 }
 
 void mqtt_loop(){
-    mqttClient.loop();
+
+    mqtt_handle_wifi();
+    mqtt_handle_connection();
+
+    if (mqttClient.connected())
+        mqttClient.loop();
 }

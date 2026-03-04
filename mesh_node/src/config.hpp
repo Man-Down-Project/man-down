@@ -4,8 +4,8 @@
 #define NODE_ID 1
 
 //wifi config
-#define WIFI_SSID "wifi name"
-#define WIFI_PASS "wifi password"
+#define WIFI_SSID "COMFAST_9F9A_2G"
+#define WIFI_PASS "Kafademapa7078"
 
 //MQTT config
 #define MQTT_BROKER "ip"
