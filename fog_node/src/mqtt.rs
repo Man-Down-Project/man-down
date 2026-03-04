@@ -1,6 +1,6 @@
 use crate::events::Envelope;
 use rumqttc::{AsyncClient, Event, Key, MqttOptions, Packet, QoS, Transport};
-use std::{env, fs, time::Duration};
+use std::{env, time::Duration};
 use tokio::sync::{mpsc::Sender, watch};
 
 #[derive(Debug, Clone)]
@@ -20,14 +20,14 @@ pub struct MqttConfig {
 
 impl MqttConfig {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let host = env_var("MQTT_HOST", "127.0.0.1");
+        let host = env_var("MQTT_HOST", "127.0.0.1"); // localhost byts mot 127.0.0.1
         let port = env_var("MQTT_PORT", "8883").parse::<u16>()?;
         let client_id = env_var("MQTT_CLIENT_ID", "fog-node");
         let topic = env_var("MQTT_TOPIC", "md/v1/device/+/events");
 
         let ca_path = env_var("MQTT_CA_PATH", "certs/ca.crt");
         let client_cert_path = env_var("MQTT_CERT_PATH", "certs/fog.crt");
-        let client_key_path = env_var("MQTT_KEY_PATH", "certs/fog.key");
+        let client_key_path = env_var("MQTT_KEY_PATH", "certs/fog_rsa.key");
 
         let keep_alive_secs = env_var("MQTT_KEEP_ALIVE_SECS", "5").parse()?;
         let reconnect_delay_secs = env_var("MQTT_RECONNECT_DELAY_SECS", "3").parse()?;
@@ -55,6 +55,14 @@ pub async fn start_mqtt_tls(
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cfg = MqttConfig::from_env()?;
+    log::info!(
+        "MQTT TLS config: host={} port={} ca={} cert={} key={}",
+        cfg.host,
+        cfg.port,
+        cfg.ca_path,
+        cfg.client_cert_path,
+        cfg.client_key_path
+    );
 
     loop {
         if *shutdown_rx.borrow() {
@@ -91,20 +99,20 @@ async fn run_once(
     tx: &Sender<Envelope>,
     shutdown_rx: &mut watch::Receiver<bool>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let ca = fs::read(&cfg.ca_path)
+    let ca = std::fs::read(&cfg.ca_path)
         .map_err(|e| format!("Could not read CA '{}': {}", cfg.ca_path, e))?;
-    let client_cert = fs::read(&cfg.client_cert_path)
+    let client_cert = std::fs::read(&cfg.client_cert_path)
         .map_err(|e| format!("Could not read cert '{}': {}", cfg.client_cert_path, e))?;
-    let client_key = fs::read(&cfg.client_key_path)
+    let client_key = std::fs::read(&cfg.client_key_path)
         .map_err(|e| format!("Could not read key '{}': {}", cfg.client_key_path, e))?;
 
     let mut mqttoptions = MqttOptions::new(&cfg.client_id, &cfg.host, cfg.port);
     mqttoptions.set_keep_alive(Duration::from_secs(cfg.keep_alive_secs));
-    mqttoptions.set_transport(Transport::tls(
-        ca,
-        Some((client_cert, Key::RSA(client_key))),
-        None,
-    ));
+    //mqttoptions.set_transport(Transport::tls(
+    //    ca,
+    //    Some((client_cert, Key::RSA(client_key))),
+    //    None,
+    //));
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 

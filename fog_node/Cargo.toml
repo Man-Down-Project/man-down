@@ -25,3 +25,4 @@ env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
 
 dotenvy = "0.15"
+rustls-pemfile = "2"
