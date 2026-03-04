@@ -62,3 +62,72 @@ impl Envelope {
         Ok(())
     }
 }
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct EdgeEvent {
+    pub device_id: u8,
+    pub event_type: u8,
+    pub location: u8,
+    pub battery: u8,
+    pub seq: u8,
+    pub auth_tag: [u8; 8],
+}
+
+impl EdgeEvent {
+    pub const LEN: usize = 13;
+
+    pub fn from_bytes(b: &[u8]) -> Option<Self> {
+        if b.len() != Self::LEN {
+            return None;
+        }
+
+        Some(Self {
+            device_id: b[0],
+            event_type: b[1],
+            location: b[2],
+            battery: b[3],
+            seq: b[4],
+            auth_tag: b[5..13].try_into().ok()?,
+        })
+    }
+
+    pub fn to_envelope(self, mesh_node_id: String) -> Envelope {
+        let device_id = self.device_id.to_string();
+
+        let incident = match self.event_type {
+            0x00 => Incident::Login {
+                worker_id: device_id.clone(),
+            },
+            0x01 => Incident::Logout {
+                worker_id: device_id.clone(),
+            },
+            0x02 => Incident::ManDown {
+                zone_hint: Some(self.location.to_string()),
+            },
+            0x03 => Incident::BatteryLow {
+                battery_level: self.battery,
+            },
+            0x04 => Incident::MeshDisconnect { duration_s: 0 },
+            _ => Incident::SensorFault {
+                fault: SensorFault {
+                    sensor: SensorType::Unknown,
+                    severity: FaultSeverity::Warning,
+                    code: Some(self.event_type as u32),
+                    message: Some(format!(
+                        "Unknown event_type=0x{:02x} location={} battery={} seq={}",
+                        self.event_type, self.location, self.battery, self.seq
+                    )),
+                },
+            },
+        };
+
+        Envelope {
+            device_id,
+            mesh_node_id,
+            seq: self.seq as u64,
+            sent_at: Utc::now(),
+            incident,
+        }
+    }
+}

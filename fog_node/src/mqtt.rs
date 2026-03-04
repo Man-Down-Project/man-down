@@ -1,4 +1,4 @@
-use crate::events::Envelope;
+use crate::events::{EdgeEvent, Envelope};
 use rumqttc::{AsyncClient, Event, Key, MqttOptions, Packet, QoS, Transport};
 use std::{env, time::Duration};
 use tokio::sync::{mpsc::Sender, watch};
@@ -27,7 +27,7 @@ impl MqttConfig {
 
         let ca_path = env_var("MQTT_CA_PATH", "certs/ca.crt");
         let client_cert_path = env_var("MQTT_CERT_PATH", "certs/fog.crt");
-        let client_key_path = env_var("MQTT_KEY_PATH", "certs/fog_rsa.key");
+        let client_key_path = env_var("MQTT_KEY_PATH", "certs/fog_pkcs1_rsa.key");
 
         let keep_alive_secs = env_var("MQTT_KEEP_ALIVE_SECS", "5").parse()?;
         let reconnect_delay_secs = env_var("MQTT_RECONNECT_DELAY_SECS", "3").parse()?;
@@ -99,20 +99,23 @@ async fn run_once(
     tx: &Sender<Envelope>,
     shutdown_rx: &mut watch::Receiver<bool>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let ca = std::fs::read(&cfg.ca_path)
-        .map_err(|e| format!("Could not read CA '{}': {}", cfg.ca_path, e))?;
-    let client_cert = std::fs::read(&cfg.client_cert_path)
-        .map_err(|e| format!("Could not read cert '{}': {}", cfg.client_cert_path, e))?;
-    let client_key = std::fs::read(&cfg.client_key_path)
-        .map_err(|e| format!("Could not read key '{}': {}", cfg.client_key_path, e))?;
-
     let mut mqttoptions = MqttOptions::new(&cfg.client_id, &cfg.host, cfg.port);
     mqttoptions.set_keep_alive(Duration::from_secs(cfg.keep_alive_secs));
-    //mqttoptions.set_transport(Transport::tls(
-    //    ca,
-    //    Some((client_cert, Key::RSA(client_key))),
-    //    None,
-    //));
+
+    if cfg.port == 8883 {
+        let ca = std::fs::read(&cfg.ca_path)
+            .map_err(|e| format!("Could not read CA '{}': {}", cfg.ca_path, e))?;
+        let client_cert = std::fs::read(&cfg.client_cert_path)
+            .map_err(|e| format!("Could not read cert '{}': {}", cfg.client_cert_path, e))?;
+        let client_key = std::fs::read(&cfg.client_key_path)
+            .map_err(|e| format!("Could not read key '{}': {}", cfg.client_key_path, e))?;
+
+        mqttoptions.set_transport(Transport::tls(
+            ca,
+            Some((client_cert, Key::RSA(client_key))),
+            None,
+        ));
+    }
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
 
@@ -130,6 +133,13 @@ async fn run_once(
             ev = eventloop.poll() => {
                 let ev = ev?;
                 if let Event::Incoming(Packet::Publish(p)) = ev {
+
+                    if let Some(edge) = EdgeEvent::from_bytes(&p.payload){
+                        let env = edge.to_envelope("mesh-unknown".to_string());
+                        tx.send(env).await?;
+                        continue;
+                    }
+                    else {
                     match serde_json::from_slice::<Envelope>(&p.payload) {
                         Ok(env) => {
                             tx.send(env).await?;
@@ -137,6 +147,7 @@ async fn run_once(
                         Err(e) => {
                             log::warn!("MQTT: invalid payload on topic={} err={}", p.topic, e);
                         }
+                    }
                     }
                 }
             }
