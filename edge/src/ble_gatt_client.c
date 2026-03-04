@@ -7,6 +7,7 @@
 #include "host/ble_gap.h"
 #include "host/ble_gatt.h"
 #include "host/ble_uuid.h"
+#include "host/ble_hs_adv.h"
 
 #include "ble.h"
 //#include "edge_config.h"
@@ -142,10 +143,6 @@ static int gatt_write_cb(uint16_t conn_handle,
     } else {
         ESP_LOGE(TAG, "Write failed");
     }
-
-    // Efter write  så disconnectar edge från mesh-nod
-    // ble_gap_terminate(conn_handle,
-    //                   BLE_ERR_REM_USER_CONN_TERM);
     
     return 0;
 }
@@ -218,6 +215,9 @@ const ble_uuid_t *gatt_get_service_uuid()
 
 int gatt_send_event(uint16_t conn_handle, edge_event_t *event)
 {
+    
+    event->seq = sequence_counter++;
+    
     if (event_char_handle == 0)
     {
         ESP_LOGE(TAG, "Characteristic handle not set");

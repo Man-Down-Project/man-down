@@ -32,10 +32,16 @@ typedef enum {
 #define EVENT_HEARTBEAT 0x00
 #define EVENT_FALLARM   0x01
 #define EVENT_GASLARM   0x02
-#define BATTERY_STATUS  94
-#define DEVICE_ID       12    
 
 #define HEART_TIMER 10000
 
+//TEST SETUP
+
+#define DEVICE_ID 1
+#define EVENT_HEARTBEAT 0x00
+//hårdkodad event_location atm
+#define BATTERY_STATUS  94
+//Seq uppdateras automatiskt i heartbeat packets
+#define AUTH_KEY 0
 
 #endif

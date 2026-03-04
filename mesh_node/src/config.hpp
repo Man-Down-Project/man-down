@@ -8,8 +8,8 @@
 #define WIFI_PASS "Kafademapa7078"
 
 //MQTT config
-#define MQTT_BROKER "ip"
-#define MQTT_PORT 8883
+#define MQTT_BROKER "192.168.0.2"
+#define MQTT_PORT 1883
 
 //Topics
 #define MQTT_TOPIC_EVENT "mesh/edge_event"
