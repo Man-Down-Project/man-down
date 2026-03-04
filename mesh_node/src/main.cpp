@@ -6,7 +6,6 @@
 #include "auth_node.hpp"
 
 
-AuthNode authNode;
 
 
 void setup() {
