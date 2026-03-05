@@ -3,11 +3,13 @@
 
 //node config
 #define NODE_ID 1
+#define PARENT_ID 0
+#define NODE_DEPTH 1
 
+// MQTT client ID and Topics
+//#define MQTT_TOPIC_EVENT "mesh/edge_event"
 
-
-//Topics
-#define MQTT_TOPIC_EVENT "mesh/edge_event"
+#define MQTT_TOPIC_EVENT "mesh//node/%d/edge" //For TLS
 
 //System limits
 #define MAX_PAYLOAD 21

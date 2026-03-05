@@ -7,7 +7,6 @@
 
 
 
-
 void setup() {
 
   Serial.begin(115200);
@@ -18,7 +17,7 @@ void setup() {
   authNode.begin(NODE_ID); //load auth edges from EEPROM
 
   ble_init("Node_1"); //start BLE peripherals
-  mqtt_init(); //conect to wifi/mqtt broker
+  mqtt_init(); //connect to wifi/mqtt broker
   
   
 }

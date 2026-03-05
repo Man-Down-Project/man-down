@@ -1,15 +1,17 @@
 #include <Arduino.h>
 #include <WiFiS3.h>
+#include <WiFiSSLClient.h>
 #include <PubSubClient.h>
-
 #include "node.hpp"
 #include "mqtt_client.hpp"
 #include "config.hpp"
+#include "../certs/ca_cert.hpp"
+#include "../certs/client_cert.hpp"
+#include "../certs/client_key.hpp"
 
 
-
-WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
+WiFiSSLClient wifiClientSSL;
+PubSubClient mqttClient(wifiClientSSL);
 
 const char* broker = MQTT_BROKER;
 const int port = 1883;
@@ -24,8 +26,13 @@ static unsigned long lastMQTTAttempt = 0;
 
 void mqtt_init() {
 
+    wifiClientSSL.setCACert(ca_cert);
+
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    snprintf(topic, sizeof(topic), "mesh/node/%d/edge", my_node.node_id);
+    snprintf(topic, sizeof(topic), "mesh/node/%d/edge", NODE_ID);
+
+    Serial.print("MQTT topic: ");
+    Serial.println(topic);
 }
 
 void mqtt_handle_wifi() {
