@@ -1,4 +1,5 @@
 #pragma once
+#include "personal_setup.hpp"
 
 //node config
 #define NODE_ID 1
