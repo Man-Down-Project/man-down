@@ -17,6 +17,7 @@
 #include "ble_gatt_client.h"
 #include "ble.h"
 #include "edge_config.h"
+#include "auth.h"
 
 // func declaration
 static void ble_tx_task(void *arg);
@@ -46,6 +47,7 @@ static uint8_t own_addr_type;
 // variables to handle retry if encryption failed
 static uint8_t enc_fail_count = 0;
 static uint32_t reconnect_delay_ms = 2000;
+static uint8_t sequence_counter = 0;
 
 #define RECONNECT_DELAY_MIN 2000
 #define RECONNECT_DELAY_MAX 30000
@@ -475,15 +477,26 @@ static void ble_tx_task(void *arg)
 static void heartbeat_timer_cb(TimerHandle_t xTimer)
 {
     edge_event_t event;
-
+    
     event.device_id = DEVICE_ID;
     event.event_type = EVENT_HEARTBEAT;
     event.event_location = 0;
     event.battery_status = BATTERY_STATUS; // Should make a func to gather battery info (don't think we have adapter for battery power)
-    event.seq = 0;
-    event.auth_key = AUTH_KEY;
+    event.seq = sequence_counter++;
+    memset(event.auth_tag,0,AUTH_TAG_LEN);
 
+    generate_auth_tag((uint8_t*)&event,
+                      sizeof(edge_event_t) - AUTH_TAG_LEN,
+                      event.auth_tag
+    );
     ble_send_event(&event);
+    
+    // ESP_LOGI(TAG,"Struct size: %d\n", sizeof(edge_event_t));
+    // ESP_LOGI(TAG,"Sending size: %d\n", sizeof(event));
+    // ESP_LOGI(TAG,"Packet size: %d\n", sizeof(edge_event_t));
+
+   
+    
 }
 
 void ble_on_ready(uint16_t conn_handle)

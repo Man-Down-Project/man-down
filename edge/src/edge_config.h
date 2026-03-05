@@ -5,14 +5,18 @@
 //Purpose is to have easy access to the structs needed through out the build
 
 #include <stdint.h>
+#define AUTH_TAG_LEN 8
+
+
 typedef struct { // external comunication
     uint8_t device_id;
     uint8_t event_type;
     uint8_t event_location;
     uint8_t battery_status;
     uint8_t seq;
-    uint8_t auth_key;
+    uint8_t auth_tag[AUTH_TAG_LEN];
 }edge_event_t;
+
 
 typedef struct {
     uint8_t accelerometer;
@@ -36,6 +40,8 @@ typedef enum {
 #define HEART_TIMER 10000
 
 //TEST SETUP
+
+#define KEY_LEN 16
 
 #define DEVICE_ID 1
 #define EVENT_HEARTBEAT 0x00

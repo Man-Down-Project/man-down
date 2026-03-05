@@ -26,7 +26,7 @@ static uint16_t service_end_handle = 0; // storing svc callback
 static uint16_t service_start_handle = 0;
 static uint16_t ack_char_handle = 0;
 
-static uint8_t sequence_counter = 0;
+//static uint8_t sequence_counter = 0;
 // Func declarations
 void send_edge_packet(uint16_t conn_handle);
 static int gatt_write_cb(uint16_t conn_handle,
@@ -216,7 +216,7 @@ const ble_uuid_t *gatt_get_service_uuid()
 int gatt_send_event(uint16_t conn_handle, edge_event_t *event)
 {
     
-    event->seq = sequence_counter++;
+    //event->seq = sequence_counter++;
     
     if (event_char_handle == 0)
     {
