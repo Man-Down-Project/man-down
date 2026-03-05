@@ -6,8 +6,7 @@
 #include "mqtt_client.hpp"
 #include "config.hpp"
 #include "../certs/ca_cert.hpp"
-#include "../certs/client_cert.hpp"
-#include "../certs/client_key.hpp"
+
 
 
 WiFiSSLClient wifiClientSSL;
