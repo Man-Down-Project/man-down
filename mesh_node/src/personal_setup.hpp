@@ -1,5 +1,5 @@
 //wifi config
-#define WIFI_SSID "Wifi name"
+#define WIFI_SSID "test"
 #define WIFI_PASS "pasword"
 
 //MQTT config
