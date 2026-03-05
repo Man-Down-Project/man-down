@@ -22,8 +22,10 @@
 // func declaration
 static void ble_tx_task(void *arg);
 static void heartbeat_timer_cb(TimerHandle_t xTimer);
-//void ble_send_event(const edge_event_t *event);
+static void start_scan();
+static void check_pairing_timeout();
 
+static uint32_t pairing_start_time = 0;
 
 // queue variables
 static edge_event_t pending_event;
@@ -88,7 +90,8 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             
             ble_gap_conn_find(event->connect.conn_handle, &desc);
             ESP_LOGI(TAG, "Bonded: %d", desc.sec_state.bonded);
-
+            
+            pairing_start_time = xTaskGetTickCount();
             ble_gap_security_initiate(current_conn_handle);
             
             current_conn_rssi = -127;
@@ -99,6 +102,9 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             
         } else {
             ESP_LOGE(TAG, "Connection failed");
+            current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+            ble_state = BLE_STATE_SCANNING;
+            start_scan();
         }
         break;
 
@@ -109,23 +115,14 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         current_conn_rssi = -127;
         
         ESP_LOGI(TAG, "Disconnected");
-        ESP_LOGI(TAG, "Scanning...");
         for (int i = 0; i < MAX_NODES; i++)
         {
             nodes[i].valid = false;
         }
 
         ble_state = BLE_STATE_SCANNING;
+        start_scan();
         
-        int rc = ble_gap_disc(own_addr_type,
-                          1000,
-                          &scan_params,
-                          gap_event,
-                          NULL);
-        if (rc != 0)
-        {
-            ESP_LOGW(TAG, "Scan start failed: %d", rc);
-        }
         break;
 
     case BLE_GAP_EVENT_DISC:
@@ -235,17 +232,19 @@ static int gap_event(struct ble_gap_event *event, void *arg)
                                          gap_event,
                                          NULL);
                 
-                if (rc != 0)
+                if (rc == 0) 
                 {
-                    ESP_LOGW(TAG, "Connect start failed: %d", rc);
+                    ble_state = BLE_STATE_CONNECTING;
                 }
-                ble_state = BLE_STATE_CONNECTING;
             } else {
                 
-                if (current_conn_rssi != -127 &&
-                    best_rssi > current_conn_rssi + ROAM_THRESHOLD)
+                // if (current_conn_rssi != -127 &&
+                //     best_rssi > current_conn_rssi + ROAM_THRESHOLD)
+                if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE &&
+                    best_rssi > current_conn_rssi + ROAM_THRESHOLD &&
+                    ble_state == BLE_STATE_READY)
                 {
-                    ESP_LOGI(TAG, "Roaming to stronger node");
+                    ESP_LOGI(TAG, "Roaming to stronger node\n Terminate current connection...");
 
                     ble_gap_terminate(current_conn_handle,
                                       BLE_ERR_REM_USER_CONN_TERM);
@@ -253,15 +252,9 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             }
         }
         
-        
-        int rc = ble_gap_disc(own_addr_type,
-                              1000,
-                              &scan_params,
-                              gap_event,
-                              NULL);
-        if (rc != 0)
+        if (ble_state != BLE_STATE_CONNECTING)
         {
-            ESP_LOGW(TAG, "Scan restart failed: %d", rc);
+            start_scan();
         }
         
         break;
@@ -271,7 +264,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         ESP_LOGI(TAG, "enc status=%d", event->enc_change.status);
         gatt_client_reset();
         if (event->enc_change.status == 0) {
-            
+            pairing_start_time = 0;
             enc_fail_count = 0;
             reconnect_delay_ms = RECONNECT_DELAY_MIN;
 
@@ -295,15 +288,23 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 
             reconnect_delay_ms = RECONNECT_DELAY_MIN << enc_fail_count;
 
-            if (reconnect_delay_ms > RECONNECT_DELAY_MAX) {
+            if (reconnect_delay_ms > RECONNECT_DELAY_MAX) 
+            {
                 reconnect_delay_ms = RECONNECT_DELAY_MAX;
             }
 
             ESP_LOGW(TAG, "Retry in %lu ms (fail count=%d)",
-                     reconnect_delay_ms, enc_fail_count);
+                     reconnect_delay_ms, 
+                     enc_fail_count);
             
-            ble_gap_terminate(current_conn_handle,
-                              BLE_ERR_REM_USER_CONN_TERM);
+            if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
+            {
+                ble_gap_terminate(current_conn_handle,
+                                  BLE_ERR_REM_USER_CONN_TERM);
+            }
+
+            current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+            ble_state = BLE_STATE_SCANNING;
         }
         break;
 
@@ -341,16 +342,16 @@ static void ble_app_on_sync(void)
     }
 
     ESP_LOGI(TAG, "BLE stack synchronized");
-
-     rc = ble_gap_disc(own_addr_type,
-                       1000,
-                       &scan_params,
-                       gap_event,
-                       NULL);
-    if (rc != 0)
-    {
-        ESP_LOGW(TAG, "Scan start failed: %d", rc);
-    }
+    start_scan();
+    // rc = ble_gap_disc(own_addr_type,
+    //                    1000,
+    //                    &scan_params,
+    //                    gap_event,
+    //                    NULL);
+    // if (rc != 0)
+    // {
+    //     ESP_LOGW(TAG, "Scan start failed: %d", rc);
+    // }
     
     ble_state = BLE_STATE_SCANNING;
 }
@@ -490,12 +491,11 @@ static void heartbeat_timer_cb(TimerHandle_t xTimer)
                       event.auth_tag
     );
     ble_send_event(&event);
+    check_pairing_timeout();
     
     // ESP_LOGI(TAG,"Struct size: %d\n", sizeof(edge_event_t));
     // ESP_LOGI(TAG,"Sending size: %d\n", sizeof(event));
     // ESP_LOGI(TAG,"Packet size: %d\n", sizeof(edge_event_t));
-
-   
     
 }
 
@@ -508,14 +508,46 @@ void ble_on_ready(uint16_t conn_handle)
         gatt_send_event(conn_handle, &pending_event);
         event_pending = false;
     }
+    start_scan();
+}
 
-    int rc = ble_gap_disc(own_addr_type,
-                          1000,
-                          &scan_params,
-                          gap_event,
-                          NULL);
-    if (rc != 0)
+static void start_scan()
+{
+    if(ble_state == BLE_STATE_CONNECTING)
     {
-        ESP_LOGW(TAG, "Background scan failed: %d", rc);
+        return;
+    }
+    int rc = 0;
+    ESP_LOGI(TAG, "SCANNING...");
+    rc = ble_gap_disc(own_addr_type,
+                       3000,
+                       &scan_params,
+                       gap_event,
+                       NULL);
+    if (rc != 0 && rc != BLE_HS_EBUSY)
+    {
+        ESP_LOGW(TAG, "Scan start failed: %d", rc);
+    }
+}
+
+static void check_pairing_timeout()
+{
+    if (ble_state == BLE_STATE_CONNECTED ||
+        ble_state == BLE_STATE_DISCOVERING)
+    {
+        uint32_t now = xTaskGetTickCount();
+
+        if (pairing_start_time &&
+            (now - pairing_start_time) > pdMS_TO_TICKS(15000))
+        {
+            ESP_LOGW(TAG, "Pairing timeout, restarting connection");
+
+            if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
+            {
+                ble_gap_terminate(current_conn_handle,
+                                  BLE_ERR_REM_USER_CONN_TERM);
+            }
+            pairing_start_time = 0;
+        }
     }
 }
