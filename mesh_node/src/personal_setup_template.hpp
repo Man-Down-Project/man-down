@@ -1,5 +1,5 @@
 ///--------------------------------------------------------------------------
-///Uppdate ure local personal_setup.hpp file
+///Create local personal_setup.hpp file in src directory using below defines
 ///--------------------------------------------------------------------------
 
 
