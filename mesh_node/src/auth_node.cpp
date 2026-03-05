@@ -86,12 +86,13 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 
             // --- HMAC verification ---
             SHA256 sha;
+            uint8_t full_hash[32];
             uint8_t computed_tag[AUTH_TAG_LEN];
 
             sha.resetHMAC(_authorized_edge[i].shared_key, KEY_LEN);
             sha.update((uint8_t*)pkt, sizeof(edge_event_t) - AUTH_TAG_LEN);
-            sha.finalizeHMAC(_authorized_edge[i].shared_key, KEY_LEN, computed_tag, AUTH_TAG_LEN);
-
+            sha.finalizeHMAC(_authorized_edge[i].shared_key, KEY_LEN, full_hash, AUTH_TAG_LEN);
+            memcpy(computed_tag, full_hash, AUTH_TAG_LEN);
             // compare computed HMAC with received auth_tag
             if (memcmp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN) != 0) {
                 Serial.println("Auth tag mismatch!");

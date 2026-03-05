@@ -4,8 +4,8 @@
 #define NODE_ID 1
 
 //wifi config
-#define WIFI_SSID "COMFAST_9F9A_2G"
-#define WIFI_PASS "Kafademapa7078"
+#define WIFI_SSID "Tele2_333f71_2.4Ghz"
+#define WIFI_PASS "qdzjtnwi"
 
 //MQTT config
 #define MQTT_BROKER "192.168.0.2"
@@ -15,7 +15,7 @@
 #define MQTT_TOPIC_EVENT "mesh/edge_event"
 
 //System limits
-#define MAX_PAYLOAD 8
+#define MAX_PAYLOAD 21
 #define AUTH_TAG_LEN 8 // unneccesary?
 #define KEY_LEN 16
 #define EEPROM_START 0
