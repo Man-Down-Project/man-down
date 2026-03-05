@@ -1,6 +1,6 @@
 //wifi config
-#define WIFI_SSID "Tele2_333f71_2.4Ghz"
-#define WIFI_PASS "qdzjtnwi"
+#define WIFI_SSID "Wifi name"
+#define WIFI_PASS "pasword"
 
 //MQTT config
 #define MQTT_BROKER "192.168.0.2"
