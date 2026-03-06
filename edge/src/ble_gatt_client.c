@@ -26,9 +26,7 @@ static uint16_t service_end_handle = 0; // storing svc callback
 static uint16_t service_start_handle = 0;
 static uint16_t ack_char_handle = 0;
 
-//static uint8_t sequence_counter = 0;
 // Func declarations
-void send_edge_packet(uint16_t conn_handle);
 static int gatt_write_cb(uint16_t conn_handle,
                          const struct ble_gatt_error *error,
                          struct ble_gatt_attr *attr,
@@ -119,10 +117,10 @@ static int gatt_chr_cb(uint16_t conn_handle,
         if (ack_char_handle != 0) {
             //const char *msg = "HEARTBEAT"; // just here for testing
             ble_gattc_disc_all_dscs(conn_handle,
-                                ack_char_handle,
-                                service_end_handle,
-                                gatt_dsc_cb,
-                                NULL);
+                                    ack_char_handle,
+                                    service_end_handle,
+                                    gatt_dsc_cb,
+                                    NULL);
 
         } else {
             ESP_LOGE(TAG, "Target characteristic not found!");
@@ -138,12 +136,14 @@ static int gatt_write_cb(uint16_t conn_handle,
                          struct ble_gatt_attr *attr,
                          void *arg)
 {
-    if (error->status == 0) {
+    if (error->status == 0) 
+    {
         ESP_LOGI(TAG, "Write successful");
-    } else {
+    } 
+    else 
+    {
         ESP_LOGE(TAG, "Write failed");
     }
-    
     return 0;
 }
 
@@ -216,27 +216,22 @@ const ble_uuid_t *gatt_get_service_uuid()
 int gatt_send_event(uint16_t conn_handle, edge_event_t *event)
 {
     
-    //event->seq = sequence_counter++;
-    
     if (event_char_handle == 0)
     {
         ESP_LOGE(TAG, "Characteristic handle not set");
         return -1;
     }
-
     if (conn_handle == BLE_HS_CONN_HANDLE_NONE) 
     {
         ESP_LOGE(TAG, "No active connection");
         return -1;
     }
-
     int rc = ble_gattc_write_flat(conn_handle,
                                   event_char_handle,
                                   event,
                                   sizeof(edge_event_t),
                                   gatt_write_cb,
                                   NULL);
-    
     if (rc != 0)
     {
         ESP_LOGE(TAG, "Write failed: %d", rc);

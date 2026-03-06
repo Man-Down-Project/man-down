@@ -6,6 +6,12 @@
 
 #include <stdint.h>
 
+
+// BLE Params
+#define SCAN_LENGTH 1000
+// Temp.Blacklist parameters
+#define MAX_CONNECT_FAILS 3
+#define NODE_BLACKLIST_TIME pdMS_TO_TICKS(60000) // <-1min blacklist
 //TEST SETUP
 #define AUTH_TAG_LEN 8
 #define EVENT_HEARTBEAT 0x00
