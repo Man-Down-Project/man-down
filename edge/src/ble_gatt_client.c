@@ -10,6 +10,7 @@
 #include "host/ble_hs_adv.h"
 
 #include "ble.h"
+#include "ble_internal.h"
 //#include "edge_config.h"
 
 // Service UUID etc

@@ -6,7 +6,14 @@
 
 #include <stdint.h>
 
+// --------------------------------------------------------------------------
+// >                           Configuration                                <
+// --------------------------------------------------------------------------
 
+#define ROAM_THRESHOLD 16
+#define RSSI_SMOOTH_FACTOR 3
+#define PAIRING_TIMEOUT 8000
+#define ACK_TIMEOUT_MS 200
 // BLE Params
 #define SCAN_LENGTH 1000
 // Temp.Blacklist parameters
@@ -17,12 +24,9 @@
 #define EVENT_HEARTBEAT 0x00
 #define EVENT_FALLARM   0x01
 #define EVENT_GASLARM   0x02
-
 #define HEART_TIMER 10000
 #define KEY_LEN 16
-
 #define DEVICE_ID 1
-#define EVENT_HEARTBEAT 0x00
 //hårdkodad event_location atm
 #define BATTERY_STATUS  94
 //Seq uppdateras automatiskt i heartbeat packets

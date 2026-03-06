@@ -10,64 +10,19 @@
 #include "esp_bt.h"
 #include "nvs_flash.h"
 
-#include "nimble/nimble_port.h"
-#include "nimble/nimble_port_freertos.h"
-
 #include "host/ble_hs.h"
 #include "host/ble_gap.h"
 
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
+#include "edge_config.h"
+#include "ble_internal.h"
+#include "ble_nodes.h"
 #include "ble_gatt_client.h"
 #include "ble.h"
-#include "edge_config.h"
-#include "auth.h"
-// --------------------------------------------------------------------------
-// >                   FwdDeclaration of functions                          <
-// --------------------------------------------------------------------------
-
-static void ble_tx_task(void *arg);
-static void heartbeat_timer_cb(TimerHandle_t xTimer);
-
-static void start_scan();
-static void check_pairing_timeout();
-static void pairing_timeout_cb(TimerHandle_t xTimer);
-
-static int gap_event_connect(struct ble_gap_event *event);
-static int gap_event_disconnect(struct ble_gap_event *event);
-static int gap_event_disc(struct ble_gap_event *event);
-static int gap_event_disc_complete(struct ble_gap_event *event);
-static int gap_event_enc_change(struct ble_gap_event *event);
-static int gap_event_notify(struct ble_gap_event *event);
-
-// --------------------------------------------------------------------------
-// >                           Configuration                                <
-// --------------------------------------------------------------------------
-
-#define MAX_NODES 10
-#define ROAM_THRESHOLD 16
-#define RSSI_SMOOTH_FACTOR 3
-#define PAIRING_TIMEOUT 8000
-#define ACK_TIMEOUT_MS 200
-
-// --------------------------------------------------------------------------
-// >                           Logging                                      <
-// --------------------------------------------------------------------------
-
-static const char *TAG = "BLE";
-
-// --------------------------------------------------------------------------
-// >                     BLE Node Tracking                                  <
-// --------------------------------------------------------------------------
-typedef struct {
-    ble_addr_t addr;
-    int8_t     rssi;
-    bool       valid;
-    uint32_t   last_seen;
-    uint8_t    fail_count;
-    uint32_t   blacklist_timer;
-} node_info_t;
+#include "ble_gap.h"
+#include "ble_tx.h"
 
 // --------------------------------------------------------------------------
 // >                     BLE Scan Parameters                                <
@@ -82,82 +37,20 @@ static struct ble_gap_disc_params scan_params = {
         .filter_duplicates = 1
 };
 
-// --------------------------------------------------------------------------
-// >                     Global Runtime State                               <
-// --------------------------------------------------------------------------
-static node_info_t nodes[MAX_NODES];
 
-static uint16_t current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
-static ble_addr_t current_peer_addr;
-static int current_conn_rssi = -127;
-static int last_connect_index = -1;
-static uint8_t own_addr_type;
+static int gap_event_connect(struct ble_gap_event *event);
+static int gap_event_disconnect(struct ble_gap_event *event);
+static int gap_event_disc(struct ble_gap_event *event);
+static int gap_event_disc_complete(struct ble_gap_event *event);
+static int gap_event_enc_change(struct ble_gap_event *event);
+static int gap_event_notify(struct ble_gap_event *event);
+
 static uint32_t last_roam_time = 0;
-
-
-
-static TimerHandle_t pairing_timer;
+TimerHandle_t pairing_timer;
 static bool pairing_failed = false;
 static uint32_t pairing_start_time = 0;
-static uint8_t sequence_counter = 0;
 
-ble_state_t ble_state = BLE_STATE_IDLE;
-
-static volatile bool gatt_busy = false;
-static edge_event_t tx_packet;
-static bool tx_packet_pending = false;
-static uint32_t tx_send_time = 0;
-static uint32_t last_tx_time = 0;
-
-
-
-// --------------------------------------------------------------------------
-// >                     FreeRTOS Communication                             <
-// --------------------------------------------------------------------------
-
-static QueueHandle_t ble_tx_queue;
-static TimerHandle_t heartbeat_timer;
-
-static uint8_t get_node_id(const ble_addr_t *addr)
-{
-    return addr->val[5];
-}
-
-static int find_node_index(const ble_addr_t *addr)
-{
-    for (int i = 0; i < MAX_NODES; i++)
-    {
-        if (nodes[i].valid &&
-            ble_addr_cmp(&nodes[i].addr, addr) == 0)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
-static void node_failure_tracker(int index)
-{
-    nodes[index].fail_count++;
-
-    if(nodes[index].fail_count >= MAX_CONNECT_FAILS)
-    {
-        nodes[index].blacklist_timer =
-            xTaskGetTickCount() + NODE_BLACKLIST_TIME;
-        
-        nodes[index].fail_count = 0;
-        
-        ESP_LOGW(TAG, "[NODE_%d|%02X] temporarily blacklisted",
-                 index,
-                 get_node_id(&nodes[index].addr));
-
-        if (ble_gap_disc_active())
-        {
-            ble_gap_disc_cancel();
-        }
-        start_scan();
-    }
-}
+static const char *TAG = "BLE";
 
 static int gap_event(struct ble_gap_event *event, void *arg)
 {
@@ -558,195 +451,7 @@ static int gap_event_notify(struct ble_gap_event *event)
     return 0;
 }
 
-static void ble_app_on_sync(void)
-{
-    int rc;
-
-    rc = ble_hs_id_infer_auto(0, &own_addr_type);
-    if (rc != 0) {
-        ESP_LOGE(TAG, "Address infer failed");
-        return;
-    }
-
-    ESP_LOGI(TAG, "BLE stack synchronized");
-    ble_state = BLE_STATE_SCANNING;
-    start_scan(); 
-}
-
-static void ble_host_task(void *param)
-{
-    nimble_port_run();
-    nimble_port_freertos_deinit();
-}
-
-void ble_init()
-{
-    esp_err_t ret;
-    
-    ESP_LOGI(TAG, "Initializing NVS");
-    ret = nvs_flash_init();
-
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
-        ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
-    }
-    
-    ESP_LOGI(TAG, "Initializing NimBLE...");
-    nimble_port_init();
-    
-    ble_svc_gap_init();
-    ble_svc_gatt_init();
-    gatt_client_init();
-
-    ble_svc_gap_device_name_set("H2_EDGE");
-
-    ble_hs_cfg.sync_cb = ble_app_on_sync;
-    // Enable Secure connection (BLE)
-    ble_hs_cfg.sm_sc = 1;
-
-// Enable bonding (store keys in NVS)
-    ble_hs_cfg.sm_bonding = 1;
-
-// No MITM (not sure what this does yet. guessing on = 1 off = 0)
-// defaults back to legacy if not supported by the device
-    ble_hs_cfg.sm_mitm = 0;
-
-// No input/output capability
-    ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
-
-// Key distribution
-    ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC;
-    ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC;
-    // =======================================
-    //             START QUEUE + TASK
-    // =======================================
-    
-    ble_tx_queue = xQueueCreate(20, sizeof(ble_tx_msg_t));
-    if (ble_tx_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create TX queue");
-    }
-    xTaskCreate(ble_tx_task,
-                "ble_tx",
-                4096,
-                NULL,
-                5,
-                NULL);
-    
-    heartbeat_timer = xTimerCreate("hb",
-                                   pdMS_TO_TICKS(HEART_TIMER),
-                                   pdTRUE,
-                                   NULL,
-                                   heartbeat_timer_cb);
-    xTimerStart(heartbeat_timer, 0);
-    
-    pairing_timer = xTimerCreate("pair_timeout",
-                                 pdMS_TO_TICKS(PAIRING_TIMEOUT),
-                                 pdFALSE,
-                                 NULL,
-                                 pairing_timeout_cb);
-    // ========================================
-    // Start NimBLE host task (need to be last)
-    // ========================================
-    nimble_port_freertos_init(ble_host_task);
-}
-
-uint16_t ble_get_conn_handle()
-{
-    return current_conn_handle;
-}
-
-void ble_send_event(const edge_event_t *event)
-{
-    ble_tx_msg_t msg;
-    msg.event = *event;
-
-    if (xQueueSend(ble_tx_queue, &msg, 0) != pdTRUE)
-    {
-        ESP_LOGW(TAG, "TX queue full");
-    }
-}
-
-static void ble_tx_task(void *arg)
-{
-    ble_tx_msg_t msg;
-
-    while(1) {
-        if (!tx_packet_pending)
-        {
-            if (xQueueReceive(ble_tx_queue, &msg, portMAX_DELAY))
-            {
-                tx_packet = msg.event;
-                tx_packet_pending = true;
-
-                ESP_LOGI(TAG, "TX queued seq=%d", tx_packet.seq);
-            }
-        }
-        uint32_t now = xTaskGetTickCount();
-
-        bool ack_timeout = 
-            gatt_busy &&
-            (now - last_tx_time) > pdMS_TO_TICKS(ACK_TIMEOUT_MS);
-
-        if (tx_packet_pending &&
-            ble_state == BLE_STATE_READY &&
-            current_conn_handle != BLE_HS_CONN_HANDLE_NONE &&
-            (!gatt_busy || ack_timeout))
-        {
-            ESP_LOGI(TAG, "TX sending seq=%d", tx_packet.seq);
-
-            gatt_busy = true;
-            last_tx_time = xTaskGetTickCount();
-            int rc = gatt_send_event(current_conn_handle, &tx_packet);
-
-            if (rc != 0)
-            {
-                gatt_busy = false;
-                ESP_LOGW(TAG, "TX failed, will retry");
-            }
-        }
-        if (ack_timeout)
-        {
-            if((xTaskGetTickCount() - tx_send_time) > pdMS_TO_TICKS(4000))
-            {
-                ESP_LOGW(TAG, "ACK timeout, retrying seq=%d", tx_packet.seq);
-                gatt_busy = false;
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
-
-static void heartbeat_timer_cb(TimerHandle_t xTimer)
-{
-    edge_event_t event;
-    
-    event.device_id = DEVICE_ID;
-    event.event_type = EVENT_HEARTBEAT;
-    event.event_location = 0;
-    event.battery_status = BATTERY_STATUS; // Should make a func to gather battery info (don't think we have adapter for battery power)
-    event.seq = sequence_counter++;
-    memset(event.auth_tag,0,AUTH_TAG_LEN);
-
-    generate_auth_tag((uint8_t*)&event,
-                      sizeof(edge_event_t) - AUTH_TAG_LEN,
-                      event.auth_tag
-    );
-    ble_send_event(&event);
-    // ESP_LOGI(TAG,"Struct size: %d\n", sizeof(edge_event_t));
-    // ESP_LOGI(TAG,"Sending size: %d\n", sizeof(event));
-    // ESP_LOGI(TAG,"Packet size: %d\n", sizeof(edge_event_t));
-    
-}
-
-void ble_on_ready(uint16_t conn_handle)
-{
-    ble_state = BLE_STATE_READY;
-    start_scan();
-}
-
-static void start_scan()
+void start_scan(void)
 {
     if(ble_state == BLE_STATE_CONNECTING)
     {
@@ -768,29 +473,7 @@ static void start_scan()
     }
 }
 
-static void check_pairing_timeout()
-{
-    if (ble_state == BLE_STATE_CONNECTED ||
-        ble_state == BLE_STATE_DISCOVERING)
-    {
-        uint32_t now = xTaskGetTickCount();
-
-        if (pairing_start_time &&
-            (now - pairing_start_time) > pdMS_TO_TICKS(15000))
-        {
-            ESP_LOGW(TAG, "Pairing timeout, restarting connection");
-
-            if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
-            {
-                ble_gap_terminate(current_conn_handle,
-                                  BLE_ERR_REM_USER_CONN_TERM);
-            }
-            pairing_start_time = 0;
-        }
-    }
-}
-
-static void pairing_timeout_cb(TimerHandle_t xTimer)
+void pairing_timeout_cb(TimerHandle_t xTimer)
 {
     ESP_LOGW(TAG, "Pairing timeout");
 

@@ -1,0 +1,19 @@
+#ifndef BLE_TX_H
+#define BLE_TX_H
+
+#include "edge_config.h"
+
+typedef struct {
+    edge_event_t event;
+} ble_tx_msg_t;
+
+extern QueueHandle_t ble_tx_queue;
+extern TimerHandle_t heartbeat_timer;
+extern volatile bool gatt_busy;
+extern bool tx_packet_pending;
+
+void ble_send_event(const edge_event_t *event);
+void ble_tx_task(void *arg);
+void heartbeat_timer_cb(TimerHandle_t xTimer);
+
+#endif
