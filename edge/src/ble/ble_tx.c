@@ -1,7 +1,12 @@
-#include "ble_internal.h"
-#include "ble_tx.h"
-#include "ble_gatt_client.h"
-#include "auth.h"
+#include "esp_event.h"
+
+#include "config/edge_config.h"
+#include "ble/ble_internal.h"
+#include "ble/ble_tx.h"
+#include "ble/ble_gatt_client.h"
+#include "security/auth.h"
+#include "event/edge_event.h"
+#include "peripherals/battery.h"
 
 
 
@@ -10,7 +15,7 @@ static edge_event_t tx_packet;
 
 static uint32_t tx_send_time = 0;
 static uint32_t last_tx_time = 0;
-static uint8_t sequence_counter = 0;
+uint8_t sequence_counter = 0;
 
 bool tx_packet_pending = false;
 volatile bool gatt_busy = false;
@@ -85,22 +90,6 @@ void ble_tx_task(void *arg)
 
 void heartbeat_timer_cb(TimerHandle_t xTimer)
 {
-    edge_event_t event;
-    
-    event.device_id = DEVICE_ID;
-    event.event_type = EVENT_HEARTBEAT;
-    event.event_location = 0;
-    event.battery_status = BATTERY_STATUS; // Should make a func to gather battery info (don't think we have adapter for battery power)
-    event.seq = sequence_counter++;
-    memset(event.auth_tag,0,AUTH_TAG_LEN);
-
-    generate_auth_tag((uint8_t*)&event,
-                      sizeof(edge_event_t) - AUTH_TAG_LEN,
-                      event.auth_tag
-    );
-    ble_send_event(&event);
-    // ESP_LOGI(TAG,"Struct size: %d\n", sizeof(edge_event_t));
-    // ESP_LOGI(TAG,"Sending size: %d\n", sizeof(event));
-    // ESP_LOGI(TAG,"Packet size: %d\n", sizeof(edge_event_t));
-    
+    battery_set(99);
+    edge_trigger_event(EVENT_HEARTBEAT);
 }

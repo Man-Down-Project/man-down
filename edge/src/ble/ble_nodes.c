@@ -1,6 +1,7 @@
-#include "edge_config.h"
-#include "ble_nodes.h"
-#include "ble_gap.h"
+#include "config/edge_config.h"
+
+#include "ble/ble_nodes.h"
+#include "ble/ble_gap.h"
 
 static const char *TAG = "BLE_NODE";
 

@@ -16,13 +16,13 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
-#include "edge_config.h"
-#include "ble_internal.h"
-#include "ble_nodes.h"
-#include "ble_gatt_client.h"
-#include "ble.h"
-#include "ble_gap.h"
-#include "ble_tx.h"
+#include "config/edge_config.h"
+#include "ble/ble_internal.h"
+#include "ble/ble_nodes.h"
+#include "ble/ble_gatt_client.h"
+#include "ble/ble.h"
+#include "ble/ble_tx.h"
+#include "ble/ble_gap.h"
 
 // --------------------------------------------------------------------------
 // >                     BLE Scan Parameters                                <

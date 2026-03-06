@@ -3,7 +3,8 @@
 
 #include "host/ble_hs.h"
 #include "host/ble_gatt.h"
-#include "edge_config.h"
+
+#include "config/edge_config.h"
 
 int gatt_svc_cb(uint16_t conn_handle,
                      const struct ble_gatt_error *error,

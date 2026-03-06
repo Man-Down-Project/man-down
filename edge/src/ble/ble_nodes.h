@@ -1,7 +1,7 @@
 #ifndef BLE_NODES_H
 #define BLE_NODES_H
 
-#include "ble_internal.h"
+#include "ble/ble_internal.h"
 
 int find_node_index(const ble_addr_t *addr);
 void node_failure_tracker(int index);

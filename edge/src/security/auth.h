@@ -1,6 +1,9 @@
 #ifndef AUTH_H
 #define AUTH_H
 
+#include <stdint.h>
+#include <stddef.h>
+#include "config/edge_config.h"
 typedef struct {
     uint8_t device_id;
     uint8_t seq;

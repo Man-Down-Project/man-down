@@ -5,9 +5,11 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
-#include "ble.h"
-#include "ble_gatt_client.h"
-#include "edge_config.h"
+#include "ble/ble.h"
+#include "ble/ble_gatt_client.h"
+#include "config/edge_config.h"
+
+#include "peripherals/button.h"
 
 static const char *TAG = "MAIN";
 
@@ -20,6 +22,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Starting application");
 
     ble_init();
+    button_init();
 }
 
  

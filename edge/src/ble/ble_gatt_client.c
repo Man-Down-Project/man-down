@@ -9,9 +9,8 @@
 #include "host/ble_uuid.h"
 #include "host/ble_hs_adv.h"
 
-#include "ble.h"
-#include "ble_internal.h"
-//#include "edge_config.h"
+#include "ble/ble.h"
+#include "ble/ble_internal.h"
 
 // Service UUID etc
 static ble_uuid_any_t target_service_uuid;

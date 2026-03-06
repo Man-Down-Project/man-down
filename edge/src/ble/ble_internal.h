@@ -2,7 +2,7 @@
 #define BLE_INTERNAL_H
 
 #include "host/ble_gap.h"
-#include "edge_config.h"
+#include "config/edge_config.h"
 
 #define MAX_NODES 10
 
