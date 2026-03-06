@@ -29,10 +29,10 @@
 // --------------------------------------------------------------------------
 
 static struct ble_gap_disc_params scan_params = {
-        .itvl = 0x40,
-        .window = 0x20,
+        .itvl = 0x80,
+        .window = 0x10,
         .filter_policy = 0,
-        .passive = 0,
+        .passive = 1,
         .limited = 0,
         .filter_duplicates = 1
 };

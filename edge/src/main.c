@@ -10,6 +10,7 @@
 #include "config/edge_config.h"
 
 #include "peripherals/button.h"
+#include "peripherals/buzzer.h"
 
 static const char *TAG = "MAIN";
 
@@ -23,6 +24,8 @@ void app_main(void)
 
     ble_init();
     button_init();
+    buzzer_init();
+    
 }
 
  

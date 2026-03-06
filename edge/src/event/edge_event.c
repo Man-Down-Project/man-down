@@ -4,6 +4,7 @@
 #include "config/edge_config.h"
 #include "ble/ble_internal.h"
 #include "peripherals/battery.h"
+#include "peripherals/buzzer.h"
 
 void edge_trigger_event(uint8_t event_type, uint8_t battery)
 {

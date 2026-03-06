@@ -9,6 +9,7 @@
 #include "ble/ble.h"
 #include "config/edge_config.h"
 #include "battery.h"
+#include "buzzer.h"
 
 #define BUTTON_GPIO GPIO_NUM_4
 #define DOUBLE_PRESS_MS 400
@@ -99,12 +100,14 @@ static void button_task(void *arg)
         {
             ESP_LOGI(TAG, "FALL ALARM TRIGGERED");
             battery_set(50);
+            buzzer_play(BUZZER_FALL);
             edge_trigger_event(EVENT_FALLARM);
         }
         else if (state == BUTTON_LONG)
         {
             ESP_LOGI(TAG, "GAS LARM TRIGGERED");
             battery_set(25);
+            buzzer_play(BUZZER_GAS);
             edge_trigger_event(EVENT_GASLARM);
         }
         else if (state == BUTTON_RESET)
@@ -116,6 +119,7 @@ static void button_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+
 
 void button_init()
 {
