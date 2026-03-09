@@ -6,7 +6,6 @@ certs/
 
 # Local configuration
 .env
-mosquitto-dev.conf
 
 # Logs
 *.log

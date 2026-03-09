@@ -77,20 +77,29 @@ impl EdgeEvent {
     pub const LEN: usize = 12;
 
     pub fn from_bytes(b: &[u8]) -> Option<Self> {
-        if b.len() != Self::LEN {
-            return None;
+        match b.len() {
+            5 => Some(Self {
+                device_id: b[0],
+                event_type: b[1],
+                location: b[2],
+                battery: b[3],
+                seq: b[4] as u64,
+            }),
+
+            12 => {
+                let seq_bytes: [u8; 8] = b[4..12].try_into().ok()?;
+                let seq = u64::from_le_bytes(seq_bytes);
+
+                Some(Self {
+                    device_id: b[0],
+                    event_type: b[1],
+                    location: b[2],
+                    battery: b[3],
+                    seq,
+                })
+            }
+            _ => None,
         }
-
-        let seq_bytes: [u8; 8] = b[4..12].try_into().ok()?;
-        let seq = u64::from_le_bytes(seq_bytes);
-
-        Some(Self {
-            device_id: b[0],
-            event_type: b[1],
-            location: b[2],
-            battery: b[3],
-            seq,
-        })
     }
 
     pub fn to_envelope(self, mesh_node_id: String) -> Envelope {

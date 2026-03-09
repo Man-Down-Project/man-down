@@ -1,7 +1,8 @@
 use crate::events::{EdgeEvent, Envelope};
-use rumqttc::{AsyncClient, Event, Key, MqttOptions, Packet, QoS, Transport};
-use std::{env, time::Duration};
+use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
+use std::{env, io::BufReader, time::Duration};
 use tokio::sync::{mpsc::Sender, watch};
+use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
 
 #[derive(Debug, Clone)]
 pub struct MqttConfig {
@@ -20,7 +21,7 @@ pub struct MqttConfig {
 
 impl MqttConfig {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let host = env_var("MQTT_HOST", "127.0.0.1"); // localhost byts mot 127.0.0.1
+        let host = env_var("MQTT_HOST", "localhost"); //alt. localhost
         let port = env_var("MQTT_PORT", "8883").parse::<u16>()?;
         let client_id = env_var("MQTT_CLIENT_ID", "fog-node");
         let topic = env_var("MQTT_TOPIC", "md/v1/device/+/events");
@@ -48,6 +49,61 @@ impl MqttConfig {
 
 fn env_var(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+fn load_ca(path: &str) -> Result<RootCertStore, Box<dyn std::error::Error + Send + Sync>> {
+    let file = std::fs::File::open(path)?;
+    let mut reader = BufReader::new(file);
+
+    let certs = rustls_pemfile::certs(&mut reader)?;
+
+    if certs.is_empty() {
+        return Err(format!("No CA certs found in {}", path).into());
+    }
+
+    let mut roots = RootCertStore::empty();
+    for cert in certs {
+        roots.add(&Certificate(cert))?;
+    }
+
+    Ok(roots)
+}
+
+fn load_client_chain(
+    path: &str,
+) -> Result<Vec<Certificate>, Box<dyn std::error::Error + Send + Sync>> {
+    let file = std::fs::File::open(path)?;
+    let mut reader = BufReader::new(file);
+
+    let certs = rustls_pemfile::certs(&mut reader)?;
+
+    if certs.is_empty() {
+        return Err(format!("No client certs found in {}", path).into());
+    }
+
+    Ok(certs.into_iter().map(Certificate).collect())
+}
+
+fn load_key(path: &str) -> Result<PrivateKey, Box<dyn std::error::Error + Send + Sync>> {
+    let file = std::fs::File::open(path)?;
+    let mut reader = BufReader::new(file);
+
+    let mut keys = rustls_pemfile::rsa_private_keys(&mut reader)?;
+
+    if let Some(key) = keys.pop() {
+        return Ok(PrivateKey(key));
+    }
+
+    let file = std::fs::File::open(path)?;
+    let mut reader = BufReader::new(file);
+
+    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut reader)?;
+
+    if let Some(key) = keys.pop() {
+        return Ok(PrivateKey(key));
+    }
+
+    Err(format!("No private key found in {}", path).into())
 }
 
 pub async fn start_mqtt_tls(
@@ -103,18 +159,18 @@ async fn run_once(
     mqttoptions.set_keep_alive(Duration::from_secs(cfg.keep_alive_secs));
 
     if cfg.port == 8883 {
-        let ca = std::fs::read(&cfg.ca_path)
-            .map_err(|e| format!("Could not read CA '{}': {}", cfg.ca_path, e))?;
-        let client_cert = std::fs::read(&cfg.client_cert_path)
-            .map_err(|e| format!("Could not read cert '{}': {}", cfg.client_cert_path, e))?;
-        let client_key = std::fs::read(&cfg.client_key_path)
-            .map_err(|e| format!("Could not read key '{}': {}", cfg.client_key_path, e))?;
+        log::info!("MQTT: enabling TLS");
 
-        mqttoptions.set_transport(Transport::tls(
-            ca,
-            Some((client_cert, Key::RSA(client_key))),
-            None,
-        ));
+        let roots = load_ca(&cfg.ca_path)?;
+        let client_chain = load_client_chain(&cfg.client_cert_path)?;
+        let client_key = load_key(&cfg.client_key_path)?;
+
+        let tls_config = ClientConfig::builder()
+            .with_safe_defaults()
+            .with_root_certificates(roots)
+            .with_client_auth_cert(client_chain, client_key)?;
+
+        mqttoptions.set_transport(Transport::tls_with_config(tls_config.into()));
     }
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);
