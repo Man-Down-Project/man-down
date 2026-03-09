@@ -188,29 +188,38 @@ async fn run_once(
 
             ev = eventloop.poll() => {
                 let ev = ev?;
-                if let Event::Incoming(Packet::Publish(p)) = ev {
 
-                    log::info!(
-                        "MQTT: received topic={} len={} bytes={:02x?}",
-                        p.topic,
-                        p.payload.len(),
-                        &p.payload
-                    );
+                match ev {
+                    Event::Incoming(Packet::Publish(p)) =>{
+                        log::info!(
+                            "MQTT: received topic={} len={} bytes={:02x?}",
+                            p.topic,
+                            p.payload.len(),
+                            &p.payload
+                        );
 
-                    if let Some(edge) = EdgeEvent::from_bytes(&p.payload){
-                        let env = edge.to_envelope("mesh-unknown".to_string());
-                        tx.send(env).await?;
-                        continue;
-                    }
-                    else {
-                    match serde_json::from_slice::<Envelope>(&p.payload) {
-                        Ok(env) => {
+                        if let Some(edge) = EdgeEvent::from_bytes(&p.payload){
+                            let env = edge.to_envelope("mesh-unknown".to_string());
                             tx.send(env).await?;
                         }
-                        Err(e) => {
-                            log::warn!("MQTT: invalid payload on topic={} err={}", p.topic, e);
+                        else {
+                            match serde_json::from_slice::<Envelope>(&p.payload) {
+                                Ok(env) => {
+                                    tx.send(env).await?;
+                                }
+                                Err(e) => {
+                                    log::warn!("MQTT: invalid payload on topic={} err={}", p.topic, e);
+                                }
+                            }
                         }
                     }
+
+                    Event::Incoming(packet) => {
+                        log::debug!("MQTT incoming packet: {:?}", packet);
+                    }
+
+                    Event::Outgoing(packet) => {
+                        log::debug!("MQTT outgoing packet: {:?}", packet);
                     }
                 }
             }
