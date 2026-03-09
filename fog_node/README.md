@@ -9,9 +9,9 @@ Each developer runs everything locally.
 
 ---
 
-## 1. Install Mosquitto
+# 1. Install Mosquitto
 
-### Ubuntu / WSL
+## Ubuntu / WSL
 
 ```bash
 sudo apt update
@@ -35,12 +35,24 @@ cp mosquitto.conf.example mosquitto-dev.conf
 ```
 This creates local certificates in certs/
 
+### Example structure
+
+certs/
+  ca.crt
+  ca.key
+  server.crt
+  server.key
+  fog.crt
+  fog.key
+
 ## Start the broker
 
 Open Terminal 1:
 ```bash
 ./scripts/start-mosquitto.sh
 ```
+The broker will start with TLS enabled on port:
+8883
 
 ## Start Fog
 
@@ -48,8 +60,17 @@ Open Terminal 2:
 ```bash
 cargo run
 ```
+You should see logs similar to:
+MQTT: connecting host=localhost port=8883
+MQTT: connected
+MQTT: subscribed
+
+The fog node subscribes to:
+md/v1/device/+/events
 
 # Test with manual Publish
+Open Terminal 3 and send a test-event:
+
 ```bash
 mosquitto_pub \
   --cafile certs/ca.crt \
@@ -62,4 +83,27 @@ mosquitto_pub \
   ```
   If everything works, the fog app will log the received event.
 
+Example output:
+Processing device_id=test seq=1 incident=Login
+Login worker_id=123
   
+## Notes
+
+The fog node accepts both:
+
+JSON events
+
+Binary edge events
+
+Logging level can be controlled with:
+```bash
+RUST_LOG=info cargo run
+```
+or
+```bash
+RUST_LOG=debug cargo run
+```
+
+## Quick Start
+
+
