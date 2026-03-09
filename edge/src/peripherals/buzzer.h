@@ -15,5 +15,6 @@ typedef enum
 
 void buzzer_init();
 void buzzer_play(buzzer_pattern_t pattern);
+void buzzer_stop();
 
 #endif

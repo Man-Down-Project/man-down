@@ -17,7 +17,7 @@ static ble_uuid_any_t target_service_uuid;
 static ble_uuid_any_t event_rx_uuid;
 static ble_uuid_any_t ack_tx_uuid;
 
-static const char *TAG = "BLE_GATT";
+static const char *TAG = "[BLE_GATT]";
 // GATT variables
 static uint16_t event_char_handle = 0;
 //static uint16_t target_char_handle = 0;

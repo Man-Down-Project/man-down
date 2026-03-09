@@ -23,6 +23,7 @@
 #include "ble/ble.h"
 #include "ble/ble_tx.h"
 #include "ble/ble_gap.h"
+//#include "system/system_events.h"
 
 // --------------------------------------------------------------------------
 // >                     BLE Scan Parameters                                <
@@ -50,7 +51,7 @@ TimerHandle_t pairing_timer;
 static bool pairing_failed = false;
 static uint32_t pairing_start_time = 0;
 
-static const char *TAG = "BLE";
+static const char *TAG = "[BLE_GAP]";
 
 static int gap_event(struct ble_gap_event *event, void *arg)
 {
@@ -87,9 +88,9 @@ static int gap_event_connect(struct ble_gap_event *event)
     if (event->connect.status == 0) 
     {
         ble_state = BLE_STATE_CONNECTED;
-        ESP_LOGI(TAG, "Connected");
         pairing_failed = false;
-            
+        ESP_LOGI(TAG, "Connected");
+        
         current_conn_handle = event->connect.conn_handle;
             
         ble_gap_conn_find(event->connect.conn_handle, &desc);
@@ -438,14 +439,14 @@ static int gap_event_notify(struct ble_gap_event *event)
     }
     os_mbuf_copydata(om, 0, len, data);
 
-    ESP_LOGI(TAG, "ACK seq=%d status =%d", data[0], data[1]);
-    
+    uint8_t seq = data[0];
     uint8_t status = data[1];
 
-    if (status == 1)
-    {
-        tx_packet_pending = false;
-    }
+    ESP_LOGI(TAG, "ACK seq=%d status =%d", data[0], data[1]);
+    
+    
+    tx_packet_pending = false;
+    
     gatt_busy = false;
 
     return 0;

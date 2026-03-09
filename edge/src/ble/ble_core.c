@@ -26,12 +26,13 @@
 #include "ble/ble_gap.h"
 #include "ble/ble_tx.h"
 #include "ble/ble_gatt_client.h"
+#include "system/system_events.h"
 
 // --------------------------------------------------------------------------
 // >                           Logging                                      <
 // --------------------------------------------------------------------------
 
-static const char *TAG = "BLE";
+static const char *TAG = "[BLE_CORE]";
 
 // --------------------------------------------------------------------------
 // >                     Global Runtime State                               <
@@ -127,7 +128,7 @@ void ble_init()
                 "ble_tx",
                 4096,
                 NULL,
-                5,
+                7,
                 NULL);
     
     heartbeat_timer = xTimerCreate("hb",

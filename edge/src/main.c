@@ -5,26 +5,32 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 
+
 #include "ble/ble.h"
 #include "ble/ble_gatt_client.h"
 #include "config/edge_config.h"
-
 #include "peripherals/button.h"
 #include "peripherals/buzzer.h"
+#include "peripherals/led.h"
+#include "peripherals/sensors/accelerometer.h"
+// #include "system/system_events.h"
+// #include "system/event_task.h"
+
 
 static const char *TAG = "MAIN";
-
-#define BUTTON_GPIO 10 // Button pin
-#define BUZZER_GPIO 12 // Buzzer pin
-#define Accelerometer_GPIO 22 //Accelerometer pin
 
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting application");
-
+    //system_event_init();
+    
+    //event_task_start();
     ble_init();
+    accelerometer_init();
     button_init();
     buzzer_init();
+    led_init();
+
     
 }
 

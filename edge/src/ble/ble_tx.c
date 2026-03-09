@@ -24,7 +24,7 @@ TimerHandle_t heartbeat_timer;
 
 
 
-static const char *TAG = "TX";
+static const char *TAG = "[BLE_TX]";
 
 
 void ble_send_event(const edge_event_t *event)

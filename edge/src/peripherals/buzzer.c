@@ -3,9 +3,10 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
+#include "config/edge_config.h"
 #include "buzzer.h"
 
-#define BUZZER_GPIO GPIO_NUM_5
+
 
 static const char *TAG = "BUZZER";
 
@@ -31,12 +32,11 @@ static void buzzer_task(void *arg)
         {
             case BUZZER_FALL:
             {
-                buzzer_beep_loop(100, 3);
+                buzzer_beep_loop(100, 2);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 buzzer_beep_loop(300, 3);
                 vTaskDelay(pdMS_TO_TICKS(200));
-                buzzer_beep_loop(100, 3);
-                current_pattern = BUZZER_NONE;
+                buzzer_beep_loop(100, 2);
                 break;
             }
             case BUZZER_GAS:
@@ -44,8 +44,7 @@ static void buzzer_task(void *arg)
                 buzzer_on();
                 vTaskDelay(pdMS_TO_TICKS(1000));
                 buzzer_off();
-
-                current_pattern = BUZZER_NONE;
+                vTaskDelay(pdMS_TO_TICKS(500));
                 break;
             }
             case BUZZER_LOW_BATTERY:
@@ -96,6 +95,11 @@ void buzzer_init()
                 "buzzer",
                 2048,
                 NULL,
-                5,
+                7,
                 NULL);
+}
+void buzzer_stop()
+{
+    current_pattern = BUZZER_NONE;
+    buzzer_off();
 }

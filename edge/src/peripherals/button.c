@@ -10,11 +10,14 @@
 #include "config/edge_config.h"
 #include "battery.h"
 #include "buzzer.h"
+#include "led.h"
+// #include "system/event_task.h"
+// #include "system/system_events.h"
 
-#define BUTTON_GPIO GPIO_NUM_4
+
 #define DOUBLE_PRESS_MS 400
 #define LONG_PRESS_MS 1000
-#define LONG_RESET_MS 10000
+#define LONG_RESET_MS 3000
 #define LONG_POWER_MS 20000
 #define DEBOUNCE_MS 50
 
@@ -69,7 +72,8 @@ static button_event_t button_update()
             } 
             else
             {
-                if (waiting_double_press)
+                if (waiting_double_press &&
+                    pdTICKS_TO_MS(now - first_press_time) <= DOUBLE_PRESS_MS)
                 {
                     waiting_double_press = false;
                     return BUTTON_DOUBLE;
@@ -102,6 +106,7 @@ static void button_task(void *arg)
             battery_set(50);
             buzzer_play(BUZZER_FALL);
             edge_trigger_event(EVENT_FALLARM);
+            led_set(RGB_RED, LED_MODE_BLINK);
         }
         else if (state == BUTTON_LONG)
         {
@@ -112,8 +117,15 @@ static void button_task(void *arg)
         }
         else if (state == BUTTON_RESET)
         {
-            ESP_LOGW(TAG, "DEVICE RESET TRIGGERED");
-            esp_restart();
+            ESP_LOGW(TAG, "ALARM RESET");
+            led_set(RGB_OFF, LED_MODE_OFF);
+            buzzer_stop();
+        }
+        else if (state == BUTTON_DOUBLE) {
+            ESP_LOGW(TAG, "DOUBLE PRESS");
+            led_set(RGB_MAGENTA, LED_MODE_BLINK);
+            vTaskDelay(pdMS_TO_TICKS(2000));
+            led_set(RGB_OFF, LED_MODE_OFF);
         }
         
         vTaskDelay(pdMS_TO_TICKS(10));

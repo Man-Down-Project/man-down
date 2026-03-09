@@ -5,18 +5,28 @@
 //Purpose is to have easy access to the structs needed through out the build
 
 #include <stdint.h>
+#include "freertos/FreeRTOS.h"
 
 // --------------------------------------------------------------------------
 // >                           Configuration                                <
 // --------------------------------------------------------------------------
 
+#define BUZZER_GPIO GPIO_NUM_5
+#define BUTTON_GPIO GPIO_NUM_4
+
+#define LED_RED     GPIO_NUM_0
+#define LED_GREEN   GPIO_NUM_1
+#define LED_BLUE    GPIO_NUM_2
+
+#define I2C_MASTER_SCL_IO   GPIO_NUM_12
+#define I2C_MASTER_SDA_IO   GPIO_NUM_22
+#define BMA400_INT_PIN      GPIO_NUM_10
+
 #define ROAM_THRESHOLD 16
 #define RSSI_SMOOTH_FACTOR 3
 #define PAIRING_TIMEOUT 8000
 #define ACK_TIMEOUT_MS 200
-// BLE Params
 #define SCAN_LENGTH 1000
-// Temp.Blacklist parameters
 #define MAX_CONNECT_FAILS 3
 #define NODE_BLACKLIST_TIME pdMS_TO_TICKS(60000) // <-1min blacklist
 //TEST SETUP
