@@ -9,5 +9,5 @@
 #define WIFI_PASS "WiFi password"
 
 //MQTT config
-#define MQTT_BROKER "192.168.0.2"
+#define MQTT_BROKER "IP addres"
 #define MQTT_PORT 1883 //(use port 8883 insted for TLS)
