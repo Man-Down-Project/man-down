@@ -1,8 +1,6 @@
 #pragma once
 #include "personal_setup.hpp"
 #include "../certs/ca_cert.hpp"
-#include "../certs/client_cert.hpp"
-#include "../certs/client_key.hpp"
 
 
 //node config
