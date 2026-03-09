@@ -18,8 +18,6 @@ void setup() {
 
   ble_init("Node_1"); //start BLE peripherals
   mqtt_init(); //connect to wifi/mqtt broker
-  
-  
 }
 
 void loop() {
