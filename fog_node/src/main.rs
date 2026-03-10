@@ -18,7 +18,6 @@ async fn main() {
     let cfg = MqttConfig::from_env().expect("Failed to load config");
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
-
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let processor = tokio::spawn(run_processor(rx));

@@ -1,7 +1,7 @@
 use crate::config::MqttConfig;
 use crate::events::{EdgeEvent, Envelope};
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
-use std::{env, io::BufReader, time::Duration};
+use std::{io::BufReader, time::Duration};
 use tokio::sync::{mpsc::Sender, watch};
 use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
 

@@ -104,6 +104,5 @@ or
 RUST_LOG=debug cargo run
 ```
 
-## Quick Start
 
 
