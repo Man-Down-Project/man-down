@@ -3,7 +3,7 @@
 #include "node.hpp"
 #include "mqtt_client.hpp"
 #include "config.hpp"
-
+#include "../certs/ca_cert.hpp"
 
 struct childEvent_t {
     edge_event_out msg;
@@ -15,9 +15,11 @@ std::queue<childEvent_t> childEventQueue;
 WiFiSSLClient wifiClientSSL;
 PubSubClient mqttClient(wifiClientSSL);
 char topic [MAX_TOPIC_SIZE];
+char provision_topic[64];
 
 static unsigned long lastWifiAttempt = 0;
 static unsigned long lastMQTTAttempt = 0;
+static const char* active_ca = ca_cert;
 
 char broker_ip[16];
 int broker_port = MQTT_PORT;
@@ -27,6 +29,9 @@ int current_parent = 0;
 void mqtt_init() {
 
     wifiClientSSL.setCACert(ca_cert);
+
+    mqttClient.setCallback(mqtt_callback);
+
 
     //choosing broker
     if (NODE_DEPTH == 1){
@@ -78,6 +83,13 @@ void mqtt_handle_connection() {
 
     if (mqttClient.connect(client_id, "", "")) {
         Serial.println("MQTT connected");
+
+        snprintf(provision_topic, sizeof(provision_topic),
+                "mesh/node/%d/provision/ca", NODE_ID);
+
+        mqttClient.subscribe(provision_topic);
+        Serial.println("Subscribed to provisioning topic...");
+
     }else{
         Serial.print("MQTT failed: ");
         Serial.println(mqttClient.state());
@@ -118,7 +130,29 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
     );
 }
 
-bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id){
+void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int length) {
+
+    if (strcmp(topic, "mesh/provision/ca") != 0)
+        return;
+    Serial.println("Provisioning: New CA received");
+
+    char newCA[length +1];
+    memcpy(newCA, payload, length);
+    newCA[length] = '\0';
+
+    Serial.println("Rebooting to apply new CA...");
+    delay(500);
+    NVIC_SystemReset();
+    
+}
+
+void mqtt_callback(char* topic, byte* payload, unsigned int length){
+    mqtt_provision_handeling(topic, payload, length);
+
+    //can add other message handler here....
+}
+
+bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id) {
     if (!mqttClient.connected())
     return false;
 

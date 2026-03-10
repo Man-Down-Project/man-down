@@ -4,6 +4,8 @@
 #include "config.hpp"
 #include "edge_event.hpp"
 
+
+
 struct eeprom_edge_t {
     uint8_t device_id;
     uint8_t shared_key[KEY_LEN];

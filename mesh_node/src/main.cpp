@@ -4,14 +4,22 @@
 #include "node.hpp"
 #include "mqtt_client.hpp"
 #include "auth_node.hpp"
+#include "led_graphics.hpp"
 
 
 
 void setup() {
 
   Serial.begin(115200);
+  matrix.begin();
+  
   delay(100);
- // while (!Serial); //can block if usb not connected
+
+  led_indication(wifi_symbol);
+
+  led_indication(envelope);
+
+
 
   node_init(NODE_ID); //init node struct
   authNode.begin(NODE_ID); //load auth edges from EEPROM
