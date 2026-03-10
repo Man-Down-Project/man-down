@@ -5,23 +5,21 @@ mod storage;
 
 use config::MqttConfig;
 use events::{Envelope, Incident};
+use storage::Storage;
 use tokio::sync::{mpsc, watch};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
     env_logger::init();
 
-    if let Ok(host) = std::env::var("MQTT_HOST") {
-        log::info!("MQTT_HOST={}", host);
-    }
+    let cfg = MqttConfig::from_env()?;
+    let storage = Storage::new("fog.db")?;
 
-    let cfg = MqttConfig::from_env().expect("Failed to load config");
+    log::info!("MQTT broker: {}:{}", cfg.host, cfg.port);
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
-
-    let processor = tokio::spawn(run_processor(rx));
 
     let mqtt_tx = tx.clone();
     let shutdown_rx = shutdown_rx.clone();
@@ -33,27 +31,38 @@ async fn main() {
         }
     });
 
-    if let Err(e) = tokio::signal::ctrl_c().await {
-        log::error!("Failed to listen for Ctrl+C: {}", e);
+    let processor = run_processor(rx, storage);
+
+    tokio::select! {
+        _= tokio::signal::ctrl_c() => {
+           log::info!("Ctrl+C received, shutting down...");
+        }
+        _= processor => {
+            log::info!("Processor exited");
+        }
     }
 
-    log::info!("Ctrl+C received, shutting down...");
     let _ = shutdown_tx.send(true);
 
     drop(tx);
 
     let _ = mqtt_task.await;
-    let _ = processor.await;
 
     log::info!("Shutdown complete");
+    Ok(())
 }
 
-async fn run_processor(mut rx: mpsc::Receiver<Envelope>) {
+async fn run_processor(mut rx: mpsc::Receiver<Envelope>, storage: Storage) {
     while let Some(env) = rx.recv().await {
         if let Err(e) = env.validate_basic() {
             log::warn!("Dropped invalid envelope: {}", e);
             continue;
         }
+
+        if let Err(e) = storage.insert_event(&env) {
+            log::error!("Failed to store event: {}", e);
+        }
+
         process_envelope(env).await;
     }
 
