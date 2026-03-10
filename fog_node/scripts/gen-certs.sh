@@ -37,14 +37,16 @@ echo "Certificates generated successfully."
 
 echo "Generating node CA header..."
 
-OUTPUT="../node/certs/ca_cert.hpp"
+OUTPUT="../../mesh_node/certs/ca_cert.hpp"
 
-mkdir -p ../node/certs
+mkdir -p ../../mesh_node/certs
 
 echo "#pragma once" > $OUTPUT
 echo "" >> $OUTPUT
 echo "static const char ca_cert[] = R\"EOF(" >> $OUTPUT
 
-cat ca.cert >> $OUTPUT
+cat ca.crt >> $OUTPUT
+
+echo ")EOF\";" >> $OUTPUT
 
 echo "ca_cert.hpp generated successfully."
