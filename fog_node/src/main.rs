@@ -1,6 +1,7 @@
 mod config;
 mod events;
 mod mqtt;
+mod storage;
 
 use config::MqttConfig;
 use events::{Envelope, Incident};
