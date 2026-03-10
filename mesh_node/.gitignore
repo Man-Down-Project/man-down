@@ -3,5 +3,5 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-certs/local_cert.hpp
+certs/ca_cert.hpp
 src/personal_setup.hpp

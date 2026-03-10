@@ -34,3 +34,17 @@ openssl x509 -req -in fog.csr \
 rm *.csr *.srl 
 
 echo "Certificates generated successfully."
+
+echo "Generating node CA header..."
+
+OUTPUT="../node/certs/ca_cert.hpp"
+
+mkdir -p ../node/certs
+
+echo "#pragma once" > $OUTPUT
+echo "" >> $OUTPUT
+echo "static const char ca_cert[] = R\"EOF(" >> $OUTPUT
+
+cat ca.cert >> $OUTPUT
+
+echo "ca_cert.hpp generated successfully."
