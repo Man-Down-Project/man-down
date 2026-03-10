@@ -1,6 +1,8 @@
+mod config;
 mod events;
 mod mqtt;
 
+use config::MqttConfig;
 use events::{Envelope, Incident};
 use tokio::sync::{mpsc, watch};
 
@@ -13,19 +15,21 @@ async fn main() {
         log::info!("MQTT_HOST={}", host);
     }
 
-    let (tx, mut rx) = mpsc::channel::<Envelope>(100);
+    let cfg = MqttConfig::from_env().expect("Failed to load config");
+
+    let (tx, rx) = mpsc::channel::<Envelope>(100);
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let processor = tokio::spawn(run_processor(rx));
 
-    let mqtt_task = tokio::spawn({
-        let mqtt_tx = tx.clone();
-        let shutdown_rx = shutdown_rx.clone();
-        async move {
-            if let Err(e) = mqtt::start_mqtt_tls(mqtt_tx, shutdown_rx).await {
-                log::error!("MQTT task exited with error: {}", e);
-            }
+    let mqtt_tx = tx.clone();
+    let shutdown_rx = shutdown_rx.clone();
+    let cfg = cfg.clone();
+
+    let mqtt_task = tokio::spawn(async move {
+        if let Err(e) = mqtt::start_mqtt_tls(cfg, mqtt_tx, shutdown_rx).await {
+            log::error!("MQTT task exited with error: {}", e);
         }
     });
 
@@ -47,7 +51,7 @@ async fn main() {
 async fn run_processor(mut rx: mpsc::Receiver<Envelope>) {
     while let Some(env) = rx.recv().await {
         if let Err(e) = env.validate_basic() {
-            log::warn!("Dropped invalid envelope {}", e);
+            log::warn!("Dropped invalid envelope: {}", e);
             continue;
         }
         process_envelope(env).await;
