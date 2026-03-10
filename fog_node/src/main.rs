@@ -9,22 +9,15 @@ async fn main() {
     let _ = dotenvy::dotenv();
     env_logger::init();
 
-    log::info!("MQTT_HOST = {:?}", std::env::var("MQTT_HOST"));
+    if let Ok(host) = std::env::var("MQTT_HOST") {
+        log::info!("MQTT_HOST={}", host);
+    }
 
     let (tx, mut rx) = mpsc::channel::<Envelope>(100);
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    let processor = tokio::spawn(async move {
-        while let Some(env) = rx.recv().await {
-            if let Err(e) = env.validate_basic() {
-                log::warn!("Dropped invalid envelope: {}", e);
-                continue;
-            }
-            process_envelope(env).await;
-        }
-        log::info!("Processor: channel closed, exiting");
-    });
+    let processor = tokio::spawn(run_processor(rx));
 
     let mqtt_task = tokio::spawn({
         let mqtt_tx = tx.clone();
@@ -49,6 +42,18 @@ async fn main() {
     let _ = processor.await;
 
     log::info!("Shutdown complete");
+}
+
+async fn run_processor(mut rx: mpsc::Receiver<Envelope>) {
+    while let Some(env) = rx.recv().await {
+        if let Err(e) = env.validate_basic() {
+            log::warn!("Dropped invalid envelope {}", e);
+            continue;
+        }
+        process_envelope(env).await;
+    }
+
+    log::info!("Processor: channel closed, exiting");
 }
 
 async fn process_envelope(env: Envelope) {
