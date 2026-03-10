@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+IP=$(hostname -I | awk '{print $1}')
+echo "Detected broker IP: $IP"
+
 mkdir -p certs
 cd certs
 
@@ -11,12 +14,13 @@ openssl req -x509 -new -nodes -days 365 \
 
 echo "Generating server certificate..."
 openssl req -newkey rsa:2048 -nodes \
-  -subj "/CN=localhost" \
+  -subj "/CN=$IP" \
   -keyout server.key -out server.csr
 
 openssl x509 -req -in server.csr \
   -CA ca.crt -CAkey ca.key -CAcreateserial \
   -out server.crt -days 365
+
 
 echo "Generating fog client certificate..."
 openssl req -newkey rsa:2048 -nodes \
@@ -27,6 +31,6 @@ openssl x509 -req -in fog.csr \
   -CA ca.crt -CAkey ca.key -CAcreateserial \
   -out fog.crt -days 365
 
-rm *.csr *.srl
+rm *.csr *.srl 
 
 echo "Certificates generated successfully."

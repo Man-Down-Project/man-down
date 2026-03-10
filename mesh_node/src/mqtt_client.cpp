@@ -76,7 +76,7 @@ void mqtt_handle_connection() {
     char client_id[32];
     snprintf(client_id, sizeof(client_id), "node_%d", NODE_ID);
 
-    if (mqttClient.connect(client_id)) {
+    if (mqttClient.connect(client_id, "", "")) {
         Serial.println("MQTT connected");
     }else{
         Serial.print("MQTT failed: ");
