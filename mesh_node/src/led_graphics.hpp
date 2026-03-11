@@ -3,46 +3,29 @@
 #include <ArduinoGraphics.h>
 #include <Arduino_LED_Matrix.h>
 
-ArduinoLEDMatrix matrix;
+extern ArduinoLEDMatrix matrix;
 
-uint8_t wifi_symbol[96] = {
-    0,0,1,1,1,1,1,1,1,1,0,0,  // top arc
-    0,1,0,0,0,0,0,0,0,0,1,0,  // second arc
-    1,0,0,1,1,1,1,1,1,0,0,1,  // third arc
-    0,0,1,0,0,0,0,0,0,1,0,0,  // small inner arc
-    0,1,0,0,1,1,1,1,0,0,1,0,  // repeat inner arc
-    0,0,0,1,0,0,0,0,1,0,0,0,  // dot
-    0,0,0,0,0,1,1,0,0,0,0,0,  // empty row
-    0,0,0,0,0,0,0,0,0,0,0,0   // empty row
+
+enum systemState{
+    STATE_BOOT,
+    STATE_BLE_CONNECTING,
+    STATE_BLE_CONNECTED,
+    STATE_WIFI_CONNECTING,
+    STATE_WIFI_CONNECTED,
+    STATE_MQTT_CONNECTING,
+    STATE_MQTT_CONNECTED,
+    STATE_MESSAGE_SENT,
+    STATE_ERROR
 };
 
-uint8_t envelope[96] = {
-    1,1,1,1,1,1,1,1,1,1,1,1,  // top border
-    1,1,0,0,0,0,0,0,0,0,1,1,  // upper part
-    1,0,1,0,0,0,0,0,0,1,0,1,  // upper part
-    1,0,0,1,0,0,0,0,1,0,0,1,  // envelope flap
-    1,0,0,0,1,0,0,1,0,0,0,1,  // envelope flap
-    1,0,0,0,0,1,1,0,0,0,0,1,  // envelope flap
-    1,0,0,0,0,0,0,0,0,0,0,1,  // bottom part
-    1,1,1,1,1,1,1,1,1,1,1,1   // bottom border
-};
+extern uint8_t wifi_symbol[96];
+extern uint8_t mqtt_image[96];
+extern uint8_t TLS_image[96];
+extern uint8_t error_image[96];
+extern uint8_t success_image[96];
+extern uint8_t message_image[96];
 
-uint8_t middleFinger[8][12] = {
-  {0,0,0,0,1,1,0,0,0,0,0,0},
-  {0,0,0,0,1,1,0,0,0,0,0,0},
-  {0,0,0,0,1,1,0,0,0,0,0,0},
-  {0,0,1,1,1,1,1,1,0,0,0,0},
-  {0,1,1,1,1,1,1,1,1,0,0,0},
-  {0,1,1,1,1,1,1,1,1,0,0,0},
-  {0,0,1,1,1,1,1,1,0,0,0,0},
-  {0,0,0,1,1,1,1,0,0,0,0,0}
-};
+extern systemState currentState;
 
-void led_indication(uint8_t bitmap[96]){
-    matrix.beginDraw();
-    matrix.loadPixels(bitmap,96);
-    delay(5000);
-    matrix.endDraw();
-
-}
-
+void led_indication(uint8_t bitmap[96]);
+void update_leds();

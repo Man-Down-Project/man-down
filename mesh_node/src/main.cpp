@@ -11,16 +11,10 @@
 void setup() {
 
   Serial.begin(115200);
-  matrix.begin();
+  //matrix.begin();
   
   delay(100);
-
-  led_indication(wifi_symbol);
-
-  led_indication(envelope);
-
-
-
+  //update_leds();
   node_init(NODE_ID); //init node struct
   authNode.begin(NODE_ID); //load auth edges from EEPROM
 
@@ -29,10 +23,9 @@ void setup() {
 }
 
 void loop() {
- 
+  //update_leds();
   ble_poll(authNode); // hadles BLE events and forwarding via MQTT
   mqtt_loop(); //keeps MQTT client alive
-
 }
 
 
