@@ -39,7 +39,10 @@ static void handle_event(system_event_t *ev)
             break;
         
         case EVENT_BUTTON_RESET:
-
+            led_set(RGB_OFF, LED_MODE_OFF);
+            buzzer_stop();
+            led_set(RGB_GREEN, LED_MODE_BLINK);
+            
             led_set(RGB_OFF, LED_MODE_OFF);
             break;
         

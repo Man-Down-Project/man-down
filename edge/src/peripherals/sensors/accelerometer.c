@@ -44,9 +44,7 @@ static void IRAM_ATTR bma400_isr(void *arg)
     if (higher_woken)
     {
         portYIELD_FROM_ISR();
-    }
-    
-    
+    }  
 }
 /*---------------- I2C Driver---------------*/
 void i2c_master_init(void)

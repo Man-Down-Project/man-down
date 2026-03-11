@@ -28,10 +28,7 @@ void app_main(void)
     accelerometer_init();
     button_init();
     buzzer_init();
-    led_init();
-    
-
-    
+    led_init(); 
 }
 
  
