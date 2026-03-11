@@ -17,3 +17,5 @@ certs/
 *.bak
 *.swp
 *~
+
+mosquitto-dev.conf
