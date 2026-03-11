@@ -11,17 +11,23 @@
 // >                           Configuration                                <
 // --------------------------------------------------------------------------
 
+// BUZZER pin setup
 #define BUZZER_GPIO GPIO_NUM_5
+
+// BUTTON pin setup
 #define BUTTON_GPIO GPIO_NUM_4
 
+// External RGB LED SETUP
 #define LED_RED     GPIO_NUM_0
 #define LED_GREEN   GPIO_NUM_1
 #define LED_BLUE    GPIO_NUM_2
 
+// Sparkfun BMA400 pin setup
 #define I2C_MASTER_SCL_IO   GPIO_NUM_12
 #define I2C_MASTER_SDA_IO   GPIO_NUM_22
 #define BMA400_INT_PIN      GPIO_NUM_10
 
+// BLE SETUP
 #define ROAM_THRESHOLD 16
 #define RSSI_SMOOTH_FACTOR 3
 #define PAIRING_TIMEOUT 8000
@@ -29,7 +35,8 @@
 #define SCAN_LENGTH 1000
 #define MAX_CONNECT_FAILS 3
 #define NODE_BLACKLIST_TIME pdMS_TO_TICKS(60000) // <-1min blacklist
-//TEST SETUP
+
+//TEST PAYLOAD SETUP
 #define AUTH_TAG_LEN 8
 #define EVENT_HEARTBEAT 0x00
 #define EVENT_FALLARM   0x01
