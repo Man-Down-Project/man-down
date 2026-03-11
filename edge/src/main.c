@@ -13,8 +13,8 @@
 #include "peripherals/buzzer.h"
 #include "peripherals/led.h"
 #include "peripherals/sensors/accelerometer.h"
-// #include "system/system_events.h"
-// #include "system/event_task.h"
+#include "system/system_events.h"
+#include "system/event_task.h"
 
 
 static const char *TAG = "MAIN";
@@ -22,14 +22,14 @@ static const char *TAG = "MAIN";
 void app_main(void)
 {
     ESP_LOGI(TAG, "Starting application");
-    //system_event_init();
     
-    //event_task_start();
+    event_task_init();
     ble_init();
     accelerometer_init();
     button_init();
     buzzer_init();
     led_init();
+    
 
     
 }

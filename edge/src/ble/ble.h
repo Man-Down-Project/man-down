@@ -9,6 +9,5 @@ void ble_send_event(const edge_event_t *event);
 void ble_init();
 uint16_t ble_get_conn_handle();
 void ble_on_ready(uint16_t conn_handle);
-void edge_trigger_event(uint8_t event_type);
 
 #endif

@@ -1,5 +1,4 @@
 #include <stdbool.h>
-
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -8,12 +7,11 @@
 #include "button.h"
 #include "ble/ble.h"
 #include "config/edge_config.h"
-#include "battery.h"
-#include "buzzer.h"
 #include "led.h"
-// #include "system/event_task.h"
-// #include "system/system_events.h"
-
+#include "system/event_task.h"
+#include "system/system_events.h"
+//#include "battery.h"
+//#include "buzzer.h"
 
 #define DOUBLE_PRESS_MS 400
 #define LONG_PRESS_MS 1000
@@ -94,6 +92,7 @@ static button_event_t button_update()
     }
     return BUTTON_NONE;
 }
+
 static void button_task(void *arg)
 {
     while(1)
@@ -102,36 +101,24 @@ static void button_task(void *arg)
 
         if (state == BUTTON_SHORT)
         {
-            ESP_LOGI(TAG, "FALL ALARM TRIGGERED");
-            battery_set(50);
-            buzzer_play(BUZZER_FALL);
-            edge_trigger_event(EVENT_FALLARM);
-            led_set(RGB_RED, LED_MODE_BLINK);
+            system_event_post(EVENT_BUTTON_SHORT, 0);
         }
         else if (state == BUTTON_LONG)
         {
-            ESP_LOGI(TAG, "GAS LARM TRIGGERED");
-            battery_set(25);
-            buzzer_play(BUZZER_GAS);
-            edge_trigger_event(EVENT_GASLARM);
+            system_event_post(EVENT_BUTTON_LONG, 0);
         }
         else if (state == BUTTON_RESET)
         {
-            ESP_LOGW(TAG, "ALARM RESET");
-            led_set(RGB_OFF, LED_MODE_OFF);
-            buzzer_stop();
+            system_event_post(EVENT_BUTTON_RESET, 0);
         }
-        else if (state == BUTTON_DOUBLE) {
-            ESP_LOGW(TAG, "DOUBLE PRESS");
-            led_set(RGB_MAGENTA, LED_MODE_BLINK);
-            vTaskDelay(pdMS_TO_TICKS(2000));
-            led_set(RGB_OFF, LED_MODE_OFF);
+        else if (state == BUTTON_DOUBLE) 
+        {
+            system_event_post(EVENT_BUTTON_DOUBLE, 0);
         }
         
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
-
 
 void button_init()
 {

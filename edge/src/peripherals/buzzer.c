@@ -65,6 +65,7 @@ static void buzzer_task(void *arg)
         }
     }
 }
+
 void buzzer_beep_loop(uint16_t delay_ms, uint8_t count)
 {
     for (int i = 0; i < count; i++)
@@ -75,6 +76,7 @@ void buzzer_beep_loop(uint16_t delay_ms, uint8_t count)
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
+
 void buzzer_play(buzzer_pattern_t pattern)
 {
     ESP_LOGI(TAG, "pattern=%d", pattern);
@@ -98,6 +100,7 @@ void buzzer_init()
                 7,
                 NULL);
 }
+
 void buzzer_stop()
 {
     current_pattern = BUZZER_NONE;

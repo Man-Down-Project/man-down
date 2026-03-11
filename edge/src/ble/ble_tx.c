@@ -91,5 +91,5 @@ void ble_tx_task(void *arg)
 void heartbeat_timer_cb(TimerHandle_t xTimer)
 {
     battery_set(99);
-    edge_trigger_event(EVENT_HEARTBEAT);
+    edge_trigger_event(EVENT_HEARTBEAT, battery_get());
 }

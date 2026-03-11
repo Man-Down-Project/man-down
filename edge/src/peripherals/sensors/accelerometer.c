@@ -12,8 +12,8 @@
 #include <string.h>
 
 #include "config/edge_config.h"
-#include "peripherals/led.h"
-#include "peripherals/buzzer.h"
+#include "system/event_task.h"
+#include "system/system_events.h"
 
 //-------- Hardware Config ---------//
 
@@ -213,19 +213,15 @@ static void bma400_read_accel(void)
     {
         tilt_active = true;
         ESP_LOGI(TAG, "Tilt detected -> alarm");
-        led_set(RGB_RED, LED_MODE_BLINK);
-        buzzer_play(BUZZER_FALL);
+        system_event_post(EVENT_FALL_ALARM, 0);
     }
     if (accel.z > -200 && tilt_active)
     {
         tilt_active = false;
 
         ESP_LOGI(TAG, "Orientation restored");
-        buzzer_stop();
-        led_set(RGB_OFF, LED_MODE_OFF);
-        led_set(RGB_GREEN, LED_MODE_BLINK);
-        vTaskDelay(pdMS_TO_TICKS(500));
-        led_set(RGB_OFF, LED_MODE_OFF);
+        system_event_post(EVENT_BUTTON_RESET, 0);
+        
     }
 }
 /* -------------------- Sensor task ----------------------*/
@@ -251,8 +247,8 @@ static void bma400_task(void *arg)
         {
             continue;
         }
-        bma400_dump_interrupts();
-        ESP_LOGI(TAG, "INT STATUS = 0x%04X", int_status);
+        // bma400_dump_interrupts();
+        // ESP_LOGI(TAG, "INT STATUS = 0x%04X", int_status);
         
         if (int_status & BMA400_ASSERTED_GEN1_INT)
         {
