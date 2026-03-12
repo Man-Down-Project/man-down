@@ -26,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cfg = cfg.clone();
 
     let mqtt_task = tokio::spawn(async move {
-        if let Err(e) = mqtt::start_mqtt_tls(cfg, mqtt_tx, shutdown_rx).await {
+        if let Err(e) = mqtt::start_mqtt(cfg, mqtt_tx, shutdown_rx).await {
             log::error!("MQTT task exited with error: {}", e);
         }
     });

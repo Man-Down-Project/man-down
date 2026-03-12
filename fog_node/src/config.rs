@@ -7,6 +7,9 @@ pub struct MqttConfig {
     pub client_id: String,
     pub topic: String,
 
+    pub use_tls: bool,
+    pub mesh_node_id: String,
+
     pub ca_path: String,
     pub client_cert_path: String,
     pub client_key_path: String,
@@ -22,6 +25,9 @@ impl MqttConfig {
         let client_id = env_var("MQTT_CLIENT_ID", "fog-node");
         let topic = env_var("MQTT_TOPIC", "md/v1/device/+/events");
 
+        let use_tls = env_var("MQTT_USE_TLS", "true").parse::<bool>()?;
+        let mesh_node_id = env_var("MESH_NODE_ID", "mesh-unknown");
+
         let ca_path = env_var("MQTT_CA_PATH", "certs/ca.crt");
         let client_cert_path = env_var("MQTT_CERT_PATH", "certs/fog.crt");
         let client_key_path = env_var("MQTT_KEY_PATH", "certs/fog_pkcs1_rsa.key");
@@ -34,6 +40,8 @@ impl MqttConfig {
             port,
             client_id,
             topic,
+            use_tls,
+            mesh_node_id,
             ca_path,
             client_cert_path,
             client_key_path,
