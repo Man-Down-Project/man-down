@@ -20,7 +20,7 @@ pub struct MqttConfig {
 
 impl MqttConfig {
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let host = env_var("MQTT_HOST", "localhost"); //alt. localhost
+        let host = env_var("MQTT_HOST", "localhost");
         let port = env_var("MQTT_PORT", "8883").parse::<u16>()?;
         let client_id = env_var("MQTT_CLIENT_ID", "fog-node");
         let topic = env_var("MQTT_TOPIC", "md/v1/device/+/events");
