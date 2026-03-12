@@ -1,6 +1,6 @@
 ## System overview
 
-![Overview](images/Systemoverview.png) 
+![Overview](images/Systemoverview.png)
 
 ## Fog Layer overview
 
