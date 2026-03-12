@@ -4,7 +4,7 @@
 
 ## Fog Layer overview
 
-![Fog-Layer](images/FogLayer.png) 
+![Fog-Layer](images/FogLayer1.png) 
 
 ## Mesh network overview
 
