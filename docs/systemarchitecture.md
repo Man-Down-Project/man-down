@@ -2,12 +2,15 @@
 
 ![Man-DownC4](images/c4mandown.png) 
 
-## Topology
+## System overview
 
-![Man-Down Diagram](images/topology-mandown.png) 
+![Overview](images/Systemoverview.png) 
 
 ## Mesh network overview
 
 ![Mesh-network](images/Mesh-net.png)
 ![Mesh](images/Meshnetwork.png) 
 
+## Fog Layer overview
+
+![Fog-Layer](images/FogLayer.png) 
