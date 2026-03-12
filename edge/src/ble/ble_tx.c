@@ -13,6 +13,7 @@
 
 static edge_event_t tx_packet;
 
+static int retry_count = 0;
 static uint32_t tx_send_time = 0;
 static uint32_t last_tx_time = 0;
 uint8_t sequence_counter = 0;
@@ -23,6 +24,24 @@ QueueHandle_t ble_tx_queue;
 TimerHandle_t heartbeat_timer;
 
 static const char *TAG = "[BLE_TX]";
+
+void ble_ack_received(uint8_t seq, uint8_t status)
+{
+    if (!tx_packet_pending)
+    {
+        return;
+    }
+    if (seq == tx_packet.seq)
+    {
+        ESP_LOGI(TAG, "ACK matched seq=%d status=%d", seq, status);
+        tx_packet_pending = false;
+        gatt_busy = false;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "ACK for old seq=%d (current=%d)", seq, tx_packet.seq);
+    }
+}
 
 void ble_send_event(const edge_event_t *event)
 {
@@ -47,6 +66,8 @@ void ble_tx_task(void *arg)
                 tx_packet = msg.event;
                 tx_packet_pending = true;
 
+                retry_count = 0;
+
                 ESP_LOGI(TAG, "TX queued seq=%d", tx_packet.seq);
             }
         }
@@ -61,10 +82,12 @@ void ble_tx_task(void *arg)
             current_conn_handle != BLE_HS_CONN_HANDLE_NONE &&
             (!gatt_busy || ack_timeout))
         {
-            ESP_LOGI(TAG, "TX sending seq=%d", tx_packet.seq);
+            ESP_LOGI(TAG, "TX sending seq=%d (retry=%d)", tx_packet.seq, retry_count);
 
             gatt_busy = true;
+
             last_tx_time = xTaskGetTickCount();
+            tx_send_time = last_tx_time;
             int rc = gatt_send_event(current_conn_handle, &tx_packet);
 
             if (rc != 0)
@@ -75,9 +98,19 @@ void ble_tx_task(void *arg)
         }
         if (ack_timeout)
         {
-            if((xTaskGetTickCount() - tx_send_time) > pdMS_TO_TICKS(4000))
+            retry_count++;
+
+            if(retry_count > MAX_RETRIES)
             {
-                ESP_LOGW(TAG, "ACK timeout, retrying seq=%d", tx_packet.seq);
+                ESP_LOGW(TAG, "Max retries reached seq=%d", tx_packet.seq);
+                
+                tx_packet_pending = false;
+                gatt_busy = false;
+                retry_count = 0;
+            }
+            else
+            {
+                ESP_LOGW(TAG, "ACK timeout, retry %d seq=%d", retry_count, tx_packet.seq);
                 gatt_busy = false;
             }
         }

@@ -23,5 +23,6 @@ extern uint8_t sequence_counter;
 void ble_send_event(const edge_event_t *event);
 void ble_tx_task(void *arg);
 void heartbeat_timer_cb(TimerHandle_t xTimer);
+void ble_ack_received(uint8_t seq, uint8_t status);
 
 #endif

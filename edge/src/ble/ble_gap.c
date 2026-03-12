@@ -430,24 +430,18 @@ static int gap_event_notify(struct ble_gap_event *event)
     struct os_mbuf *om = event->notify_rx.om;
 
     int len = OS_MBUF_PKTLEN(om);
-    uint8_t data[32];
 
-    if (len > sizeof(data))
+    if (len < sizeof(edge_ack_t))
     {
-        ESP_LOGW(TAG, "Notification too big: %d", len);
-        len = sizeof(data);
+        ESP_LOGW(TAG, "Invalid ACK lenght %d", len);
+        return 0;
     }
-    os_mbuf_copydata(om, 0, len, data);
+    edge_ack_t ack;
+    os_mbuf_copydata(om, 0, sizeof(edge_ack_t), &ack);
 
-    uint8_t seq = data[0];
-    uint8_t status = data[1];
-
-    ESP_LOGI(TAG, "ACK seq=%d status =%d", data[0], data[1]);
+    ESP_LOGI(TAG, "ACK seq=%d status =%d", ack.seq, ack.status);
     
-    
-    tx_packet_pending = false;
-    
-    gatt_busy = false;
+    ble_ack_received(ack.seq, ack.status);
 
     return 0;
 }

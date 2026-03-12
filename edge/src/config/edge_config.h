@@ -32,6 +32,7 @@
 #define RSSI_SMOOTH_FACTOR 3
 #define PAIRING_TIMEOUT 8000
 #define ACK_TIMEOUT_MS 200
+#define MAX_RETRIES 5
 #define SCAN_LENGTH 1000
 #define MAX_CONNECT_FAILS 3
 #define NODE_BLACKLIST_TIME pdMS_TO_TICKS(60000) // <-1min blacklist
@@ -56,6 +57,10 @@ typedef struct { // external comunication
     uint8_t auth_tag[AUTH_TAG_LEN];
 }edge_event_t;
 
+typedef struct {
+    uint8_t seq;
+    uint8_t status;
+} edge_ack_t;
 
 typedef struct {
     uint8_t accelerometer;
