@@ -35,5 +35,7 @@ private:
     bool validateHMAC(edge_event_t* pkt, uint8_t* key);
 };
 
+bool constTimeComp(const uint8_t* a, const uint8_t* b, size_t len);
+
 extern AuthNode authNode;
 

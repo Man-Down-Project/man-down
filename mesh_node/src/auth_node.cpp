@@ -1,13 +1,12 @@
 #include <string.h>
 #include <Crypto.h>
 #include <SHA256.h>
+#include <stddef.h>
 #include "auth_node.hpp"
 
 AuthNode authNode;
 
 AuthNode::AuthNode() {
-
-    //eeprom_edge_t _authorized_edges[MAX_APPROVED_EDGE];
 
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
         _authorized_edge[i].device_id = 0xFF;
@@ -19,7 +18,7 @@ AuthNode::AuthNode() {
 
 
 //test start
-void AuthNode::begin(uint8_t node_id) { //fake for key test, remove later
+void AuthNode::begin(uint8_t node_id) { //fake for key test, shold be remove later
 
     _node_id = node_id;
 
@@ -52,21 +51,30 @@ void AuthNode::begin(uint8_t node_id) { //fake for key test, remove later
 
 
 /*
-void AuthNode::begin(uint8_t node_id) {
+void AuthNode::begin(uint8_t node_id) {  //This is the live code
     _node_id = node_id;
     loadAuthorizedEdges();
 }
 */
 
 
-void AuthNode::loadAuthorizedEdges() {
+void AuthNode::loadAuthorizedEdges() { //live code
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
         int addr = EEPROM_START + i * sizeof(eeprom_edge_t); 
         EEPROM.get(addr, _authorized_edge[i]);
     }
 }
 
-//test start
+bool constTimeComp(const uint8_t* a, const uint8_t* b, size_t len){
+    uint8_t diff = 0;
+
+    for (size_t i = 0; i < len; i++) {
+        diff |= a[i] ^ b[i];
+    }
+
+    return diff == 0;
+}
+
 bool AuthNode::validateEdge(edge_event_t* pkt) {
     if (!pkt) return false;
 
@@ -79,10 +87,16 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
             if (_authorized_edge[i].key_timestamp == 0) {
                 return false; // not provisioned
             }
-
-            if (_authorized_edge[i].last_seq == seq) {
+            
+            if (_authorized_edge[i].last_seq == seq) // just for demo, remove later
+                return false;
+            /*
+            if (seq <= _authorized_edge[i].last_seq) //real code when provitioning correct
                 return false; // duplicate sequence
-            }
+
+            _authorized_edge[i].last_seq = seq;
+            */
+
 
             // --- HMAC verification ---
             SHA256 sha;
@@ -90,11 +104,11 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
             uint8_t computed_tag[AUTH_TAG_LEN];
 
             sha.resetHMAC(_authorized_edge[i].shared_key, KEY_LEN);
-            sha.update((uint8_t*)pkt, sizeof(edge_event_t) - AUTH_TAG_LEN);
+            sha.update((uint8_t*)pkt, offsetof(edge_event_t,  auth_tag));
             sha.finalizeHMAC(_authorized_edge[i].shared_key, KEY_LEN, full_hash, AUTH_TAG_LEN);
             memcpy(computed_tag, full_hash, AUTH_TAG_LEN);
             // compare computed HMAC with received auth_tag
-            if (memcmp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN) != 0) {
+            if (!constTimeComp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN)) {
                 Serial.println("Auth tag mismatch!");
 
                 Serial.print("Computed: ");
@@ -118,52 +132,7 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
     }
 
     return false; // unauthorized device
-}//test end
-
-
-
-
-
-/* REmove later maby?
-bool AuthNode::validateEdge(edge_event_t* pkt) {
-    if (!pkt) return false;
-
-    uint8_t device_id = pkt->device_id;
-    uint8_t seq = pkt->seq;
-
-    for (int i = 0; i < MAX_APPROVED_EDGE; i++) { //detect duplication
-        if (_authorized_edge[i].device_id == device_id) {
-
-            if (_authorized_edge[i].key_timestamp == 0){
-                return false;
-            }
-
-            if (_authorized_edge[i].last_seq == seq) {
-                return false;
-            }
-
-            //HMAC verification
-            SHA256 sha;
-            uint8_t computed_tag[AUTH_TAG_LEN];
-
-            sha.resetHMAC(_authorized_edge[i].shared_key, KEY_LEN);
-            sha.update((uint8_t*)pkt, sizeof(edge_event_t) - AUTH_TAG_LEN);
-            sha.finalizeHMAC(_authorized_edge[i].shared_key, KEY_LEN, computed_tag, AUTH_TAG_LEN);
-
-            if (memcmp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN) != 0) {
-                Serial.println("Auth tah mismatch!");
-                return false;
-            }
-            
-            _authorized_edge[i].last_seq = seq; //update in RAM
-            return true;
-        }
-    }
-    return false; //unathourized
 }
-*/
-
-
 
 bool AuthNode::updateEdgeKey(uint8_t device_id, uint8_t* new_key, uint32_t new_ts) {
     if (!new_key) return false;

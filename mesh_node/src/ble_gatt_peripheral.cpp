@@ -85,41 +85,21 @@ void ble_poll(AuthNode &auth){
 
     bool valid = auth.validateEdge(pkt);
     
-if (!valid) {
-  Serial.println("Unauthorized ore duplicate event");
-  uint8_t nack[BLE_ACK_SIZE] = { seq, 0x00 };
-  ackTX.writeValue(nack, BLE_ACK_SIZE);
-  return;
-}
+  if (!valid) {
+    Serial.println("Unauthorized ore duplicate event");
+    uint8_t nack[BLE_ACK_SIZE] = { seq, 0x00 };
+    ackTX.writeValue(nack, BLE_ACK_SIZE);
+    return;
+  }
 
-Serial.println("New event processed");
-bool ok = mqtt_publisher_edge_event(pkt);
-if (!ok){
-  Serial.println("MQTT publish failed");
-  return;
-}
+  Serial.println("New event processed");
+  bool ok = mqtt_publisher_edge_event(pkt);
+  if (!ok){
+    Serial.println("MQTT publish failed");
+    return;
+  }
 
-    /*
-    if (pkt->event_type == EVENT_HEARTBEAT){
-      Serial.println("Heartbeat");
-      
-    }else{
-
-      if (last_seq_per_edge[device_id] == seq){
-        Serial.println("Duplicate detected, re-ACK");
-      }else{
-        last_seq_per_edge[device_id] = seq;
-        Serial.println("New event processed"); 
-      }
-    }
-    bool ok = mqtt_publisher_edge_event(pkt);
-      if (!ok){
-        Serial.println("MQTT publish failed");
-        return;
-      }  
-    */
   uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
   ackTX.writeValue(ack, 2);
   Serial.println("ACK sent");
-  //Serial.println(pkt->device_id);
 }
