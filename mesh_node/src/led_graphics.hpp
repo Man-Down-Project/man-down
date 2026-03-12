@@ -18,6 +18,8 @@ enum systemState{
     STATE_ERROR
 };
 
+extern uint8_t boot_image[96];
+extern uint8_t ble_image[96];
 extern uint8_t wifi_symbol[96];
 extern uint8_t mqtt_image[96];
 extern uint8_t TLS_image[96];

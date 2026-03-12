@@ -23,7 +23,7 @@ void setup() {
 }
 
 void loop() {
-  //update_leds();
+  update_leds();
   ble_poll(authNode); // hadles BLE events and forwarding via MQTT
   mqtt_loop(); //keeps MQTT client alive
 }
