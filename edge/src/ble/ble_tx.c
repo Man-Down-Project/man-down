@@ -22,10 +22,7 @@ volatile bool gatt_busy = false;
 QueueHandle_t ble_tx_queue;
 TimerHandle_t heartbeat_timer;
 
-
-
 static const char *TAG = "[BLE_TX]";
-
 
 void ble_send_event(const edge_event_t *event)
 {

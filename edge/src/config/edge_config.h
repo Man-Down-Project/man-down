@@ -72,6 +72,4 @@ typedef enum {
     BLE_STATE_READY
 } ble_state_t;
 
-
-
 #endif

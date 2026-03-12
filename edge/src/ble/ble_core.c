@@ -19,7 +19,6 @@
 #include "services/gap/ble_svc_gap.h"
 #include "services/gatt/ble_svc_gatt.h"
 
-
 #include "config/edge_config.h"
 #include "ble/ble.h"
 #include "ble/ble_internal.h"
@@ -44,9 +43,6 @@ int last_connect_index = -1;
 int current_conn_rssi = -127;
 uint8_t own_addr_type;
 ble_state_t ble_state = BLE_STATE_IDLE;
-
-
-
 
 void ble_on_ready(uint16_t conn_handle)
 {
