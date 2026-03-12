@@ -1,7 +1,3 @@
-## C4 diagrams
-
-![Man-DownC4](images/c4mandown.png) 
-
 ## System overview
 
 ![Overview](images/Systemoverview.png) 
