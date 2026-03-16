@@ -8,9 +8,6 @@
 #include "event/edge_event.h"
 #include "peripherals/battery.h"
 
-
-
-
 static edge_event_t tx_packet;
 
 static int retry_count = 0;

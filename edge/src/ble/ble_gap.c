@@ -408,7 +408,7 @@ static int gap_event_enc_change(struct ble_gap_event *event)
                 nodes[n_idx].fail_count = 0;
 
                 ESP_LOGW(TAG, "[Node_%d|%02X] Blacklisted: pairing failure", 
-                         n_idx,
+                         n_idx + 1,
                          get_node_id(&nodes[n_idx].addr));
             }           
         }

@@ -196,6 +196,7 @@ void gatt_client_reset()
     ack_char_handle      = 0;
     ack_cccd_handle      = 0;
 }
+
 void gatt_client_init()
 {
     ble_uuid_from_str(&target_service_uuid,
