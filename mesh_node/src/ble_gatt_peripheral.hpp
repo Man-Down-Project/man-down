@@ -10,4 +10,4 @@
 
 
 void ble_init(const char* node_name);
-void ble_poll(AuthNode &auth);
+void ble_loop(AuthNode &auth);
