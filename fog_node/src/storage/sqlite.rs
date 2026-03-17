@@ -11,12 +11,15 @@ impl Storage {
     pub fn new(path: &str, key: &str) -> Result<Self> {
         ensure_parent_dir(path)?;
 
+        log::info!("storage: opening db at {}", path);
         let conn = Connection::open(path)?;
 
         apply_sqlcipher_key(&conn, key)?;
         verify_database_access(&conn)?;
         configure_connection(&conn)?;
         initialize_schema(&conn)?;
+
+        log::info!("storage: initialized schema");
 
         Ok(Self { conn })
     }
@@ -65,9 +68,9 @@ fn verify_database_access(conn: &Connection) -> Result<()> {
 
 fn configure_connection(conn: &Connection) -> Result<()> {
     conn.pragma_update(None, "foreign_keys", "ON")?;
-    conn.pragma_update(None, "journal_mode", "WAL")?;
-    conn.pragma_update(None, "synchronous", "NORMAL")?;
-    conn.pragma_update(None, "kdf_iter", 256000)?;
+    //conn.pragma_update(None, "journal_mode", "WAL")?;
+    //conn.pragma_update(None, "synchronous", "NORMAL")?;
+    //conn.pragma_update(None, "kdf_iter", 256000)?;
     conn.busy_timeout(Duration::from_secs(5))?;
     Ok(())
 }
@@ -76,16 +79,16 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
         CREATE TABLE IF NOT EXISTS events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        device_id TEXT NOT NULL,
-        mesh_node_id TEXT NOT NULL,
-        seq INTEGER NOT NULL,
-        sent_at TEXT NOT NULL,
-        event_type TEXT NOT NULL,
-        incident TEXT NOT NULL,
-        UNIQUE(device_id, seq)
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            mesh_node_id TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            sent_at TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            incident TEXT NOT NULL,
+            UNIQUE(device_id, seq)
         );
-            
+
         CREATE INDEX IF NOT EXISTS idx_device_time
         ON events(device_id, sent_at);
         "#,
