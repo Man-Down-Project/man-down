@@ -1,7 +1,7 @@
-use crate::config::MqttConfig;
 use crate::events::{EdgeEvent, Envelope};
+use crate::mqtt::MqttConfig;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
-use std::{error::Error, fs::File, io::BufReader, time::Duration};
+use std::{error::Error, fs::File, io::BufReader, path::Path};
 use tokio::sync::{mpsc::Sender, watch};
 use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
 
@@ -17,7 +17,7 @@ pub async fn start_mqtt(
         cfg.host,
         cfg.port,
         cfg.client_id,
-        cfg.topic,
+        cfg.subscribe_topic,
         cfg.use_tls
     );
 
@@ -32,7 +32,7 @@ pub async fn start_mqtt(
             cfg.host,
             cfg.port,
             cfg.client_id,
-            cfg.topic
+            cfg.subscribe_topic
         );
 
         match run_session(&cfg, &tx, &mut shutdown_rx).await {
@@ -46,9 +46,9 @@ pub async fn start_mqtt(
                     return Ok(());
                 }
                 log::error!("MQTT: session error: {}", e);
-                log::info!("MQTT: reconnecting in {} seconds", cfg.reconnect_delay_secs);
+                log::info!("MQTT: reconnecting in {:?}", cfg.reconnect_delay);
 
-                tokio::time::sleep(Duration::from_secs(cfg.reconnect_delay_secs)).await;
+                tokio::time::sleep(cfg.reconnect_delay).await;
             }
         }
     }
@@ -61,8 +61,10 @@ async fn run_session(
     let mqtt_options = build_mqtt_options(cfg)?;
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
-    client.subscribe(&cfg.topic, QoS::AtLeastOnce).await?;
-    log::info!("MQTT: connected and subscribed to {}", cfg.topic);
+    client
+        .subscribe(&cfg.subscribe_topic, QoS::AtLeastOnce)
+        .await?;
+    log::info!("MQTT: connected and subscribed to {}", cfg.subscribe_topic);
 
     loop {
         tokio::select! {
@@ -83,7 +85,7 @@ async fn run_session(
 
 fn build_mqtt_options(cfg: &MqttConfig) -> Result<MqttOptions, DynError> {
     let mut options = MqttOptions::new(&cfg.client_id, &cfg.host, cfg.port);
-    options.set_keep_alive(Duration::from_secs(cfg.keep_alive_secs));
+    options.set_keep_alive(cfg.keep_alive);
 
     if cfg.use_tls {
         let tls_config =
@@ -95,9 +97,9 @@ fn build_mqtt_options(cfg: &MqttConfig) -> Result<MqttOptions, DynError> {
 }
 
 fn build_tls_config(
-    ca_path: &str,
-    client_cert_path: &str,
-    client_key_path: &str,
+    ca_path: &Path,
+    client_cert_path: &Path,
+    client_key_path: &Path,
 ) -> Result<ClientConfig, DynError> {
     let roots = load_ca(ca_path)?;
     let client_chain = load_client_chain(client_cert_path)?;
@@ -165,13 +167,13 @@ fn is_shutdown_requested(shutdown_rx: &watch::Receiver<bool>) -> bool {
     *shutdown_rx.borrow()
 }
 
-fn load_ca(path: &str) -> Result<RootCertStore, DynError> {
+fn load_ca(path: &Path) -> Result<RootCertStore, DynError> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
     let certs = rustls_pemfile::certs(&mut reader)?;
     if certs.is_empty() {
-        return Err(format!("No CA certificates found in {}", path).into());
+        return Err(format!("No CA certificates found in {}", path.display()).into());
     }
 
     let mut roots = RootCertStore::empty();
@@ -182,19 +184,19 @@ fn load_ca(path: &str) -> Result<RootCertStore, DynError> {
     Ok(roots)
 }
 
-fn load_client_chain(path: &str) -> Result<Vec<Certificate>, DynError> {
+fn load_client_chain(path: &Path) -> Result<Vec<Certificate>, DynError> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
 
     let certs = rustls_pemfile::certs(&mut reader)?;
     if certs.is_empty() {
-        return Err(format!("No client certs found in {}", path).into());
+        return Err(format!("No client certs found in {}", path.display()).into());
     }
 
     Ok(certs.into_iter().map(Certificate).collect())
 }
 
-fn load_private_key(path: &str) -> Result<PrivateKey, DynError> {
+fn load_private_key(path: &Path) -> Result<PrivateKey, DynError> {
     let file = File::open(path)?;
     let mut reader = BufReader::new(file);
     let mut keys = rustls_pemfile::rsa_private_keys(&mut reader)?;
@@ -212,5 +214,5 @@ fn load_private_key(path: &str) -> Result<PrivateKey, DynError> {
         return Ok(PrivateKey(key));
     }
 
-    Err(format!("No private key found in {}", path).into())
+    Err(format!("No private key found in {}", path.display()).into())
 }

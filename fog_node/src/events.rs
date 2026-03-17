@@ -74,6 +74,7 @@ pub struct EdgeEvent {
 }
 
 impl EdgeEvent {
+    #[allow(dead_code)]
     pub const LEN: usize = 12;
 
     pub fn from_bytes(b: &[u8]) -> Option<Self> {
