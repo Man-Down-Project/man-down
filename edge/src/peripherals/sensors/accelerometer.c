@@ -205,7 +205,7 @@ static void bma400_read_accel(void)
     if (bma400_get_accel_data(BMA400_DATA_ONLY, &accel, &bma) != BMA400_OK)
         return;
     
-    ESP_LOGI(TAG, "X=%d Y=%d Z=%d", accel.x, accel.y, accel.z);
+    //ESP_LOGI(TAG, "X=%d Y=%d Z=%d", accel.x, accel.y, accel.z);
 
     if (accel.z < -900 && !tilt_active)
     {
@@ -233,7 +233,7 @@ static void bma400_task(void *arg)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         
-        ESP_LOGI(TAG, "INT triggered, pin level=%d", last_int_level);
+        //ESP_LOGI(TAG, "INT triggered, pin level=%d", last_int_level);
         vTaskDelay(pdMS_TO_TICKS(10));
         
         if(bma400_get_interrupt_status(&int_status, &bma) != BMA400_OK)
