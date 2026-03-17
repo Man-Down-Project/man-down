@@ -156,6 +156,7 @@ void ble_poll(AuthNode &auth){
   uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
   if (pkt->event_type == EVENT_HEARTBEAT){
     ackTX.writeValue(ack, 2);
+      Serial.println("Event type: Heartbeat");
   }
 
   Serial.println("New event processed");
@@ -163,6 +164,24 @@ void ble_poll(AuthNode &auth){
   if (pkt->event_type != EVENT_HEARTBEAT){
     if(ok){
       ackTX.writeValue(ack, 2);
+
+      Serial.print("Event type: ");
+
+      switch (pkt->event_type)
+      {
+      case EVENT_FALLARM:
+        Serial.println("Fallarm");
+        break;
+
+      case EVENT_GASLARM:
+        Serial.println("Gaslarm");
+        break;
+
+      default:
+        Serial.println("Unknown event type");
+        break;
+      }
+
       Serial.println("ACK sent");
       Serial.println("");
 
@@ -189,6 +208,7 @@ void ble_loop(AuthNode &auth){
       ble_poll(auth);
     }
     Serial.println("Edge disconnected");
+    Serial.println("");
 
       if (!BLE.connected()) {
         BLE.advertise();
