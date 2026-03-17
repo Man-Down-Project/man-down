@@ -11,6 +11,8 @@
 
 #include "ble/ble.h"
 #include "ble/ble_internal.h"
+#include "ble/ble_nodes.h"
+#include "ble/ble_gatt_client.h"
 
 // Service UUID etc
 static ble_uuid_any_t target_service_uuid;
@@ -45,7 +47,24 @@ static int gatt_dsc_cb(uint16_t conn_handle,
                        const struct ble_gatt_dsc *dsc,
                        void *arg);
 
-// Funcs                       
+// Funcs
+void gatt_set_handles(uint16_t svc_start,
+                      uint16_t svc_end,
+                      uint16_t event_handle,
+                      uint16_t ack_handle,
+                      uint16_t cccd_handle)
+{
+    service_start_handle = svc_start;
+    service_end_handle   = svc_end;
+    event_char_handle    = event_handle;
+    ack_char_handle      = ack_handle;
+    ack_cccd_handle      = cccd_handle;
+
+    ESP_LOGI(TAG, "GATT handles applied from cache");
+    ble_state = BLE_STATE_SUBSCRIBING;
+    gatt_enable_notifications(current_conn_handle);
+}
+
 int gatt_svc_cb(uint16_t conn_handle,
                      const struct ble_gatt_error *error,
                      const struct ble_gatt_svc *service,
@@ -58,6 +77,12 @@ int gatt_svc_cb(uint16_t conn_handle,
         if (ble_uuid_cmp(&service->uuid.u, &target_service_uuid.u) == 0) {
             service_start_handle = service->start_handle;
             service_end_handle   = service->end_handle;
+
+            int n_idx = find_node_index(&current_peer_addr);
+            if (n_idx >= 0) {
+                nodes[n_idx].svc_start = service_start_handle;
+                nodes[n_idx].svc_end   = service_end_handle;
+            }
         } 
 
     }
@@ -96,12 +121,22 @@ static int gatt_chr_cb(uint16_t conn_handle,
         if (ble_uuid_cmp(&chr->uuid.u, &event_rx_uuid.u) == 0) {
             event_char_handle = chr->val_handle;
             ESP_LOGI(TAG, "eventRX found!");
+
+            int n_idx = find_node_index(&current_peer_addr);
+            if (n_idx >= 0) {
+                nodes[n_idx].tx_handle = event_char_handle;
+            }
         }
 
         // Check for ackTX (notify characteristic)
         if (ble_uuid_cmp(&chr->uuid.u, &ack_tx_uuid.u) == 0) {
             ack_char_handle = chr->val_handle;
             ESP_LOGI(TAG, "ackTX found!");
+
+            int n_idx = find_node_index(&current_peer_addr);
+            if (n_idx >= 0) {
+                nodes[n_idx].rx_handle = ack_char_handle;
+            }
         }
     }
     else if (error->status == BLE_HS_EDONE) {
@@ -153,13 +188,18 @@ static int gatt_dsc_cb(uint16_t conn_handle,
             // CCCD - Characteristic callback description found
             ack_cccd_handle = dsc->handle;
 
-            uint16_t enable_notify = 0x0001;
-            ble_gattc_write_flat(conn_handle,
-                                 ack_cccd_handle,
-                                 &enable_notify,
-                                 sizeof(enable_notify),
-                                 subscribe_cb,
-                                 NULL);
+            int n_idx = find_node_index(&current_peer_addr);
+            if (n_idx >= 0) {
+                nodes[n_idx].cccd_handle = ack_cccd_handle;
+            }
+            gatt_enable_notifications(current_conn_handle);
+            // uint16_t enable_notify = 0x0001;
+            // ble_gattc_write_flat(conn_handle,
+            //                      ack_cccd_handle,
+            //                      &enable_notify,
+            //                      sizeof(enable_notify),
+            //                      subscribe_cb,
+            //                      NULL);
         }
     }
     return 0;
@@ -172,7 +212,20 @@ static int subscribe_cb(uint16_t conn_handle,
 {
     if (error->status == 0) {
         ESP_LOGI(TAG, "Notifications enabled");
+        notifications_ready = true;
 
+        int n_idx = find_node_index(&current_peer_addr);
+        if (n_idx >= 0) {
+            nodes[n_idx].gatt_cached = true;
+
+            ESP_LOGI(TAG, "GATT cached: node=%d svc[%d-%d] tx=%d rx=%d notify=%d",
+                     n_idx,
+                     nodes[n_idx].svc_start,
+                     nodes[n_idx].svc_end,
+                     nodes[n_idx].tx_handle,
+                     nodes[n_idx].rx_handle,
+                     nodes[n_idx].cccd_handle);
+        }
         // Write event packet after subscribing to ackTX
         ble_on_ready(conn_handle);
     } else {
@@ -234,4 +287,26 @@ int gatt_send_event(uint16_t conn_handle, edge_event_t *event)
     }
     ESP_LOGI(TAG, "Event sent");
     return 0;
+}
+
+void gatt_enable_notifications(uint16_t conn_handle)
+{
+    if (ack_cccd_handle == 0)
+    {
+        ESP_LOGE(TAG, "CCCD handle missing!");
+        return;
+    }
+    uint16_t enable = 0x0001;
+    ESP_LOGI(TAG, "Re-enabling notifications (CCCD=%d)", ack_cccd_handle);
+
+    int rc = ble_gattc_write_flat(conn_handle,
+                                  ack_cccd_handle,
+                                  &enable,
+                                  sizeof(enable),
+                                  subscribe_cb,
+                                  NULL);
+    if (rc != 0)
+    {
+        ESP_LOGE(TAG, "Failed to write CCCD: %d", rc);
+    }
 }

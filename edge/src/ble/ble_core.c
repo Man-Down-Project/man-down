@@ -27,15 +27,7 @@
 #include "ble/ble_gatt_client.h"
 #include "system/system_events.h"
 
-// --------------------------------------------------------------------------
-// >                           Logging                                      <
-// --------------------------------------------------------------------------
-
 static const char *TAG = "[BLE_CORE]";
-
-// --------------------------------------------------------------------------
-// >                     Global Runtime State                               <
-// --------------------------------------------------------------------------
 
 uint16_t current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 ble_addr_t current_peer_addr;

@@ -38,7 +38,6 @@ static struct ble_gap_disc_params scan_params = {
         .filter_duplicates = 1
 };
 
-
 static int gap_event_connect(struct ble_gap_event *event);
 static int gap_event_disconnect(struct ble_gap_event *event);
 static int gap_event_disc(struct ble_gap_event *event);
@@ -84,6 +83,7 @@ static int gap_event(struct ble_gap_event *event, void *arg)
 static int gap_event_connect(struct ble_gap_event *event)
 {
     struct ble_gap_conn_desc desc;
+    notifications_ready = false;
         
     if (event->connect.status == 0) 
     {
@@ -261,6 +261,7 @@ static int gap_event_disc(struct ble_gap_event *event)
         nodes[free_slot].last_seen = xTaskGetTickCount();
         nodes[free_slot].fail_count = 0;
         nodes[free_slot].blacklist_timer = 0;
+        nodes[free_slot].gatt_cached = false;
     }
     else
     {
@@ -280,6 +281,7 @@ static int gap_event_disc(struct ble_gap_event *event)
         nodes[weakest].valid = true;
         nodes[weakest].fail_count = 0;
         nodes[weakest].blacklist_timer = 0;
+        nodes[weakest].gatt_cached = false;
     }
     return 0;
 }
@@ -348,7 +350,7 @@ static int gap_event_disc_complete(struct ble_gap_event *event)
 
             int rc = ble_gap_connect(own_addr_type,
                                      &nodes[best_index].addr,
-                                     30000,
+                                     5000,
                                      NULL,
                                      gap_event,
                                      NULL);           
@@ -385,10 +387,30 @@ static int gap_event_enc_change(struct ble_gap_event *event)
         ble_state = BLE_STATE_DISCOVERING;
         ESP_LOGI(TAG, "Encryption established");
         
+        if (n_idx >= 0 &&
+            nodes[n_idx].gatt_cached &&
+            nodes[n_idx].tx_handle != 0)
+        {
+            ESP_LOGI(TAG, "Using cached GATT handles");
 
-        ble_gattc_disc_all_svcs(current_conn_handle,
-                                gatt_svc_cb,
-                                NULL);    
+            gatt_set_handles(
+                nodes[n_idx].svc_start,
+                nodes[n_idx].svc_end,
+                nodes[n_idx].tx_handle,
+                nodes[n_idx].rx_handle,
+                nodes[n_idx].cccd_handle
+            );
+            ble_state = BLE_STATE_READY;
+        }
+        else
+        {
+            ESP_LOGI(TAG, "Running GATT discovery");
+
+            ble_state = BLE_STATE_DISCOVERING;
+            ble_gattc_disc_all_svcs(current_conn_handle,
+                                    gatt_svc_cb,
+                                    NULL);
+        }
     }
     else
     {   

@@ -18,6 +18,8 @@ uint8_t sequence_counter = 0;
 
 bool tx_packet_pending = false;
 volatile bool gatt_busy = false;
+bool notifications_ready = false;
+bool waiting_for_ack = false;
 QueueHandle_t ble_tx_queue;
 TimerHandle_t heartbeat_timer;
 
@@ -34,6 +36,7 @@ void ble_ack_received(uint8_t seq, uint8_t status)
         ESP_LOGI(TAG, "ACK matched seq=%d status=%d", seq, status);
         tx_packet_pending = false;
         gatt_busy = false;
+        waiting_for_ack = false;
 
         if(uxQueueMessagesWaiting(ble_tx_queue) > 0)
         {
@@ -97,13 +100,14 @@ void ble_tx_task(void *arg)
 
         if (tx_packet_pending &&
             ble_state == BLE_STATE_READY &&
+            notifications_ready &&
             current_conn_handle != BLE_HS_CONN_HANDLE_NONE &&
-            (!gatt_busy || ack_timeout))
+            !waiting_for_ack)
         {
             ESP_LOGI(TAG, "TX sending seq=%d (retry=%d)", tx_packet.seq, retry_count);
 
             gatt_busy = true;
-
+            waiting_for_ack = true;
             last_tx_time = xTaskGetTickCount();
             tx_send_time = last_tx_time;
             int rc = gatt_send_event(current_conn_handle, &tx_packet);
@@ -124,6 +128,8 @@ void ble_tx_task(void *arg)
                 
                 tx_packet_pending = false;
                 gatt_busy = false;
+                waiting_for_ack = false;
+                
                 retry_count = 0;
                 if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
                 {
@@ -136,6 +142,7 @@ void ble_tx_task(void *arg)
             {
                 ESP_LOGW(TAG, "ACK timeout, retry %d seq=%d", retry_count, tx_packet.seq);
                 gatt_busy = false;
+                waiting_for_ack = false;
             }
         }
         vTaskDelay(pdMS_TO_TICKS(20));

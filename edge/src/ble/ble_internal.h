@@ -10,9 +10,19 @@ typedef struct {
     ble_addr_t addr;
     int8_t     rssi;
     bool       valid;
+    
     uint32_t   last_seen;
     uint8_t    fail_count;
     uint32_t   blacklist_timer;
+
+    uint16_t   svc_start;
+    uint16_t   svc_end;
+    uint16_t   tx_handle;
+    uint16_t   rx_handle;
+    uint16_t   cccd_handle;
+
+    bool gatt_cached;
+
 } node_info_t;
 
 //-----------Node Table-------------//
@@ -25,5 +35,6 @@ extern int current_conn_rssi;
 extern uint8_t own_addr_type;
 extern int last_connect_index;
 extern ble_state_t ble_state;
+extern bool notifications_ready;
 
 #endif
