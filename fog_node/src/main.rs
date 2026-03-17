@@ -1,10 +1,12 @@
+mod app_config;
 mod events;
 mod mqtt;
 mod storage;
 
-use crate::mqtt::MqttConfig;
-use events::{Envelope, Incident};
-use storage::Storage;
+use crate::app_config::AppConfig;
+use crate::events::{Envelope, Incident};
+use crate::mqtt::start_mqtt;
+use crate::storage::Storage;
 use tokio::sync::{mpsc, watch};
 
 #[tokio::main]
@@ -12,22 +14,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
     env_logger::init();
 
-    let cfg = MqttConfig::from_env()?;
+    let config = AppConfig::from_env()?;
+    let storage = Storage::new(&config.db_path, &config.db_key)?;
 
-    let db_path = std::env::var("DB_PATH").unwrap_or_else(|_| "data/fog.db".to_string());
-    let storage = Storage::new("data/fog.db")?;
-
-    log::info!("MQTT broker: {}:{}", cfg.host, cfg.port);
+    log::info!("MQTT broker: {}:{}", config.mqtt.host, config.mqtt.port);
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
     let mqtt_tx = tx.clone();
     let shutdown_rx = shutdown_rx.clone();
-    let cfg = cfg.clone();
+    let mqtt_config = config.mqtt.clone();
 
     let mqtt_task = tokio::spawn(async move {
-        if let Err(e) = mqtt::client::start_mqtt(cfg, mqtt_tx, shutdown_rx).await {
+        if let Err(e) = start_mqtt(mqtt_config, mqtt_tx, shutdown_rx).await {
             log::error!("MQTT task exited with error: {}", e);
         }
     });
