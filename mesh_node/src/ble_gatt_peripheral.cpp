@@ -121,7 +121,7 @@ void ble_loop(AuthNode &auth){
     //}
     Serial.println("Edge disconnected");
 
-      if (!BLE.advertise()) {
+      if (!BLE.connected()) {
         BLE.advertise();
       }
   }
