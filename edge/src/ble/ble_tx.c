@@ -4,6 +4,7 @@
 #include "ble/ble_internal.h"
 #include "ble/ble_tx.h"
 #include "ble/ble_gatt_client.h"
+#include "ble/ble_gap.h"
 #include "security/auth.h"
 #include "event/edge_event.h"
 #include "peripherals/battery.h"
@@ -59,10 +60,16 @@ void ble_send_event(const edge_event_t *event)
     ble_tx_msg_t msg;
     msg.event = *event;
 
-    if (xQueueSend(ble_tx_queue, &msg, 0) != pdTRUE)
+    if (xQueueSend(ble_tx_queue, &msg, 0) == pdTRUE)
     {
-        ESP_LOGW(TAG, "TX queue full");
+        if (ble_state == BLE_STATE_SCANNING &&
+            current_conn_handle == BLE_HS_CONN_HANDLE_NONE)
+        {
+            start_scan();
+        }
+        //ESP_LOGW(TAG, "TX queue full");
     }
+    
 }
 
 void ble_tx_task(void *arg)
@@ -140,3 +147,4 @@ void heartbeat_timer_cb(TimerHandle_t xTimer)
     battery_set(99);
     edge_trigger_event(EVENT_HEARTBEAT, battery_get());
 }
+

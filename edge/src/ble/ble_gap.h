@@ -6,6 +6,7 @@ void pairing_timeout_cb(TimerHandle_t xTimer);
 
 void start_scan(void);
 extern TimerHandle_t pairing_timer;
+bool ble_tx_pending(void);
 
 #endif
 

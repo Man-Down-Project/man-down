@@ -33,7 +33,7 @@
 #define PAIRING_TIMEOUT 8000
 #define ACK_TIMEOUT_MS 200
 #define MAX_RETRIES 5
-#define SCAN_LENGTH 1000
+#define SCAN_LENGTH 700
 #define MAX_CONNECT_FAILS 3
 #define NODE_BLACKLIST_TIME pdMS_TO_TICKS(60000) // <-1min blacklist
 

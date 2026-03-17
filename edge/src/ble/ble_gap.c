@@ -151,7 +151,6 @@ static int gap_event_disconnect(struct ble_gap_event *event)
     ESP_LOGI(TAG, "Disconnected");
         
     pairing_start_time = 0;
-    vTaskDelay(2000);
     
     ble_state = BLE_STATE_SCANNING;
     start_scan();
@@ -326,7 +325,7 @@ static int gap_event_disc_complete(struct ble_gap_event *event)
     ESP_LOGI(TAG, "Scan finished. Best RSSI=%d current RSSI=%d",
              best_rssi, current_conn_rssi);
         
-    if (best_index >= 0)
+    if (best_index >= 0 && ble_tx_pending())
     {
         if (current_conn_handle == BLE_HS_CONN_HANDLE_NONE)
         {
@@ -488,4 +487,9 @@ void pairing_timeout_cb(TimerHandle_t xTimer)
                           BLE_ERR_REM_USER_CONN_TERM);
     }
     pairing_start_time = 0;
+}
+
+bool ble_tx_pending(void)
+{
+    return uxQueueMessagesWaiting(ble_tx_queue) > 0;
 }
