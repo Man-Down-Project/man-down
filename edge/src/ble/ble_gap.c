@@ -95,23 +95,51 @@ static int gap_event_connect(struct ble_gap_event *event)
             
         ble_gap_conn_find(event->connect.conn_handle, &desc);
         ESP_LOGI(TAG, "Bonded: %d", desc.sec_state.bonded);
-            
         
-
-        if (!desc.sec_state.encrypted)
-        {
-            pairing_start_time = xTaskGetTickCount();
-            xTimerStart(pairing_timer, 0);
-            
-            ble_gap_security_initiate(current_conn_handle);
-        }    
+        pairing_start_time = 0;
         current_conn_rssi = -127;
+        last_connect_index = -1;
             
         memcpy(&current_peer_addr,
                &desc.peer_ota_addr,
                sizeof(ble_addr_t));
         
-        last_connect_index = -1;
+        
+        int n_idx = find_node_index(&current_peer_addr);
+        if (n_idx >= 0)
+        {
+            nodes[n_idx].fail_count = 0;
+            nodes[n_idx].blacklist_timer = 0;    
+        }
+        
+        ble_state = BLE_STATE_DISCOVERING;
+        ESP_LOGI(TAG, "Encryption established");
+        
+        if (n_idx >= 0 &&
+            nodes[n_idx].gatt_cached &&
+            nodes[n_idx].tx_handle != 0)
+        {
+            ESP_LOGI(TAG, "Using cached GATT handles");
+
+            gatt_set_handles(
+                nodes[n_idx].svc_start,
+                nodes[n_idx].svc_end,
+                nodes[n_idx].tx_handle,
+                nodes[n_idx].rx_handle,
+                nodes[n_idx].cccd_handle
+            );
+            ble_state = BLE_STATE_SUBSCRIBING;
+            gatt_enable_notifications(current_conn_handle);
+        }
+        else
+        {
+            ESP_LOGI(TAG, "Running GATT discovery");
+            ble_state = BLE_STATE_DISCOVERING;
+            ble_gattc_disc_all_svcs(current_conn_handle,
+                                    gatt_svc_cb,
+                                    NULL);
+        }
+        
     } 
     else
     {
@@ -377,40 +405,6 @@ static int gap_event_enc_change(struct ble_gap_event *event)
         xTimerStop(pairing_timer, 0);
         pairing_start_time = 0;
         
-        int n_idx = find_node_index(&current_peer_addr);
-        if (n_idx >= 0)
-        {
-            nodes[n_idx].fail_count = 0;
-            nodes[n_idx].blacklist_timer = 0;    
-        }
-        
-        ble_state = BLE_STATE_DISCOVERING;
-        ESP_LOGI(TAG, "Encryption established");
-        
-        if (n_idx >= 0 &&
-            nodes[n_idx].gatt_cached &&
-            nodes[n_idx].tx_handle != 0)
-        {
-            ESP_LOGI(TAG, "Using cached GATT handles");
-
-            gatt_set_handles(
-                nodes[n_idx].svc_start,
-                nodes[n_idx].svc_end,
-                nodes[n_idx].tx_handle,
-                nodes[n_idx].rx_handle,
-                nodes[n_idx].cccd_handle
-            );
-            ble_state = BLE_STATE_READY;
-        }
-        else
-        {
-            ESP_LOGI(TAG, "Running GATT discovery");
-
-            ble_state = BLE_STATE_DISCOVERING;
-            ble_gattc_disc_all_svcs(current_conn_handle,
-                                    gatt_svc_cb,
-                                    NULL);
-        }
     }
     else
     {   
