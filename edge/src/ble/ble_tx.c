@@ -5,6 +5,7 @@
 #include "ble/ble_tx.h"
 #include "ble/ble_gatt_client.h"
 #include "ble/ble_gap.h"
+#include "ble/ble_nodes.h"
 #include "security/auth.h"
 #include "event/edge_event.h"
 #include "peripherals/battery.h"
@@ -68,11 +69,18 @@ void ble_send_event(const edge_event_t *event)
         if (ble_state == BLE_STATE_SCANNING &&
             current_conn_handle == BLE_HS_CONN_HANDLE_NONE)
         {
+            if (ble_gap_disc_active())
+            {
+                ble_gap_disc_cancel();
+            }
             start_scan();
         }
         //ESP_LOGW(TAG, "TX queue full");
     }
-    
+    if (current_conn_handle == BLE_HS_CONN_HANDLE_NONE)
+    {
+        ble_connect();   
+    }
 }
 
 void ble_tx_task(void *arg)
@@ -133,7 +141,7 @@ void ble_tx_task(void *arg)
                 retry_count = 0;
                 if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
                 {
-                    vTaskDelay(pdMS_TO_TICKS(50));
+                    vTaskDelay(pdMS_TO_TICKS(10));
                     ble_gap_terminate(current_conn_handle,
                                       BLE_ERR_REM_USER_CONN_TERM);
                 }

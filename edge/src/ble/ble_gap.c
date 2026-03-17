@@ -509,3 +509,28 @@ bool ble_tx_pending(void)
 {
     return uxQueueMessagesWaiting(ble_tx_queue) > 0;
 }
+void ble_connect(void)
+{
+    int n_idx = get_best_node_index();
+        if (n_idx >= 0)
+        {
+            ESP_LOGI(TAG, "Connecting to node-%d", n_idx);
+            if (ble_gap_disc_active())
+            {
+                ble_gap_disc_cancel();
+            }
+
+            int rc = ble_gap_connect(own_addr_type,
+                                     &nodes[n_idx].addr,
+                                     5000,
+                                     NULL,
+                                     gap_event,
+                                     NULL);
+            if (rc == 0)
+            {
+                ble_state = BLE_STATE_CONNECTING;
+                return;
+            }
+        }
+        start_scan();
+}

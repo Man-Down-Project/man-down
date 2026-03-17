@@ -47,3 +47,22 @@ void node_failure_tracker(int index)
         start_scan();
     }
 }
+
+int get_best_node_index(void)
+{
+    int best_node = -1;
+    int best_rssi = -127;
+
+    for (int i = 0; i < MAX_NODES; i++)
+    {
+        if(!nodes[i].valid)
+            continue;
+        
+        if (nodes[i].rssi > best_rssi)
+        {
+            best_rssi = nodes[i].rssi;
+            best_node = i;
+        }
+    }
+    return best_node;
+}

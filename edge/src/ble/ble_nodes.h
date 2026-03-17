@@ -6,5 +6,6 @@
 int find_node_index(const ble_addr_t *addr);
 void node_failure_tracker(int index);
 uint8_t get_node_id(const ble_addr_t *addr);
+int get_best_node_index(void);
 
 #endif
