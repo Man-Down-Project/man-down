@@ -30,8 +30,8 @@
 // --------------------------------------------------------------------------
 
 static struct ble_gap_disc_params scan_params = {
-        .itvl = 0x80,
-        .window = 0x10,
+        .itvl = 0x40,
+        .window = 0x30,
         .filter_policy = 0,
         .passive = 1,
         .limited = 0,
@@ -151,6 +151,7 @@ static int gap_event_disconnect(struct ble_gap_event *event)
     ESP_LOGI(TAG, "Disconnected");
         
     pairing_start_time = 0;
+    vTaskDelay(2000);
     
     ble_state = BLE_STATE_SCANNING;
     start_scan();
@@ -322,7 +323,6 @@ static int gap_event_disc_complete(struct ble_gap_event *event)
             current_conn_rssi = rssi;
         }
     }
-
     ESP_LOGI(TAG, "Scan finished. Best RSSI=%d current RSSI=%d",
              best_rssi, current_conn_rssi);
         
@@ -342,9 +342,10 @@ static int gap_event_disc_complete(struct ble_gap_event *event)
                      nodes[best_index].addr.val[1],
                      nodes[best_index].addr.val[0]);
 
-            current_conn_rssi = nodes[best_index].rssi;
-            
+            current_conn_rssi = nodes[best_index].rssi; 
             last_connect_index = best_index;
+
+            ble_gap_disc_cancel();
 
             int rc = ble_gap_connect(own_addr_type,
                                      &nodes[best_index].addr,
@@ -448,7 +449,9 @@ static int gap_event_notify(struct ble_gap_event *event)
 
 void start_scan(void)
 {
-    if(ble_state == BLE_STATE_CONNECTING)
+    if(ble_state == BLE_STATE_CONNECTING ||
+       ble_state == BLE_STATE_CONNECTED ||
+       current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
     {
         return;
     }

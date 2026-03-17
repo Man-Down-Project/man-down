@@ -45,19 +45,13 @@ static int gatt_dsc_cb(uint16_t conn_handle,
                        const struct ble_gatt_dsc *dsc,
                        void *arg);
 
-
-
+// Funcs                       
 int gatt_svc_cb(uint16_t conn_handle,
                      const struct ble_gatt_error *error,
                      const struct ble_gatt_svc *service,
                      void *arg)
 {
-    // service_start_handle = 0;
-    // service_end_handle   = 0;
-    // event_char_handle    = 0;
-    // ack_char_handle      = 0;
-    // ack_cccd_handle      = 0;
-
+    
     if (error->status == 0) {
 
         ESP_LOGI(TAG, "Service found: start=%d end=%d", service->start_handle, service->end_handle);

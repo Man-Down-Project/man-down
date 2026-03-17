@@ -33,6 +33,20 @@ void ble_ack_received(uint8_t seq, uint8_t status)
         ESP_LOGI(TAG, "ACK matched seq=%d status=%d", seq, status);
         tx_packet_pending = false;
         gatt_busy = false;
+
+        if(uxQueueMessagesWaiting(ble_tx_queue) > 0)
+        {
+            ESP_LOGI(TAG, "More packets queued, keep connection...");
+            return;
+        }
+        
+        if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
+        {
+            ESP_LOGI(TAG, "Packets sent, disconnecting");
+            vTaskDelay(pdMS_TO_TICKS(50));
+            ble_gap_terminate(current_conn_handle, 
+                              BLE_ERR_REM_USER_CONN_TERM);
+        }
     }
     else
     {
@@ -99,11 +113,17 @@ void ble_tx_task(void *arg)
 
             if(retry_count > MAX_RETRIES)
             {
-                ESP_LOGW(TAG, "Max retries reached seq=%d", tx_packet.seq);
+                ESP_LOGW(TAG, "Max retries reached seq=%d , disconnecting", tx_packet.seq);
                 
                 tx_packet_pending = false;
                 gatt_busy = false;
                 retry_count = 0;
+                if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
+                {
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    ble_gap_terminate(current_conn_handle,
+                                      BLE_ERR_REM_USER_CONN_TERM);
+                }
             }
             else
             {
