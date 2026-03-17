@@ -93,9 +93,9 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
             /*
             if (seq <= _authorized_edge[i].last_seq) //real code when provitioning correct
                 return false; // duplicate sequence
-
-            _authorized_edge[i].last_seq = seq;
             */
+            _authorized_edge[i].last_seq = seq;
+            
 
 
             // --- HMAC verification ---

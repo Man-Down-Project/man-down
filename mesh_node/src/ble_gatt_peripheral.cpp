@@ -147,7 +147,7 @@ void ble_poll(AuthNode &auth){
     bool valid = auth.validateEdge(pkt);
     
   if (!valid) {
-    Serial.println("Unauthorized ore duplicate event");
+    Serial.println("Unauthorized or duplicate event");
     uint8_t nack[BLE_ACK_SIZE] = { seq, 0x00 };
     ackTX.writeValue(nack, BLE_ACK_SIZE);
     return;

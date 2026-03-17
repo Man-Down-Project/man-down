@@ -62,6 +62,8 @@ void mqtt_handle_wifi() {
     lastWifiAttempt = millis();
     Serial.println("Connecting Wifi...");
     WiFi.begin(WIFI_SSID, WIFI_PASS);
+    if (WiFi.status() == WL_CONNECTED) 
+        Serial.println("Wifi connected");
 }
 
 void mqtt_handle_connection() {
