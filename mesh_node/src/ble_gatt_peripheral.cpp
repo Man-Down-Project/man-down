@@ -153,17 +153,26 @@ void ble_poll(AuthNode &auth){
     return;
   }
 
-  Serial.println("New event processed");
-  bool ok = mqtt_publisher_edge_event(pkt);
-  if (!ok){
-    Serial.println("MQTT publish failed");
-    return;
+  uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
+  if (pkt->event_type == EVENT_HEARTBEAT){
+    ackTX.writeValue(ack, 2);
   }
 
-  uint8_t ack[2] = {seq, 0x01}; //0x01 = ok
-  ackTX.writeValue(ack, 2);
-  Serial.println("ACK sent");
-  Serial.println("");
+  Serial.println("New event processed");
+  bool ok = mqtt_publisher_edge_event(pkt);
+  if (pkt->event_type != EVENT_HEARTBEAT){
+    if(ok){
+      ackTX.writeValue(ack, 2);
+      Serial.println("ACK sent");
+      Serial.println("");
+
+    }else{
+      Serial.println("MQTT publish failed");
+      return;
+    }
+  }
+
+
 }
 
 
