@@ -1,4 +1,3 @@
-mod config;
 mod events;
 mod mqtt;
 mod storage;
