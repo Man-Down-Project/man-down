@@ -88,7 +88,7 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
                 return false; // not provisioned
             }
             
-            if (_authorized_edge[i].last_seq == seq) // just for demo, remove later
+            if (_authorized_edge[i].last_seq == seq) // just for demo, remove later //kolla att köra på timestapm ock paketålder ist
                 return false;
             /*
             if (seq <= _authorized_edge[i].last_seq) //real code when provitioning correct

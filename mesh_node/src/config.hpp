@@ -16,6 +16,7 @@
 
 //System limits
 #define MAX_PAYLOAD 21
+//#define MAX_DATA_PACKETS_PER_SESSION 25 //noun handeling and validation
 #define AUTH_TAG_LEN 8 
 #define KEY_LEN 16
 #define EEPROM_START 0
