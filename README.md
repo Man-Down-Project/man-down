@@ -362,5 +362,3 @@ All contributors have collaborated across the system. The responsibilities below
 - **[@daniela1o1](https://github.com/daniela1o1)** — Fog Backend  
 
 ---
-
-

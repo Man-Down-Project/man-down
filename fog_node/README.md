@@ -54,3 +54,116 @@ cp mosquitto.conf.example mosquitto-dev.conf
 This generates local TLS certificates in:
 
 certs/
+  ca.crt
+  ca.key
+  server.crt
+  server.key
+  fog.crt
+  fog.key
+
+
+---
+
+### **Block 2 – Run + Test**
+
+```md
+## TLS Configuration
+
+- Mutual TLS authentication is used  
+- All communication is encrypted  
+- Only trusted clients (signed by CA) are allowed  
+
+---
+
+## Run the System
+
+### Start MQTT Broker
+
+Open **Terminal 1**:
+
+```bash
+./scripts/start-mosquitto.sh
+```
+Broker runs on:
+localhost:8883 (TLS)
+
+## Start Fog Backend
+
+Open terminal 2:
+```bash
+cargo run
+```
+Expected output:
+```bash
+MQTT: connecting host=localhost port=8883
+MQTT: connected
+MQTT: subscribed
+```
+
+### Test the System
+
+Open Terminal 3 and publish a test event:
+```bash
+mosquitto_pub \
+  --cafile certs/ca.crt \
+  --cert certs/fog.crt \
+  --key certs/fog.key \
+  -h 127.0.0.1 \
+  -p 8883 \
+  -t "md/v1/device/test/events" \
+  -m '{"device_id":"test","mesh_node_id":"mesh1","seq":1,"sent_at":"2024-01-01T00:00:00Z","incident":{"type":"Login","worker_id":"123"}}'
+  ```
+
+  Expected output:
+  ```bash
+  Processing device_id=test seq=1 incident=Login
+  Login worker_id=123
+  ```
+
+
+---
+
+### **Block 3 – Processing + Storage + Notes**
+
+```md
+## Event Processing
+
+The fog node handles both:
+
+- JSON events (development/testing)  
+- Binary edge events (production format)  
+
+Processing steps:
+
+1. Receive MQTT message  
+2. Parse payload  
+3. Convert to structured envelope  
+4. Validate integrity and sequence  
+5. Classify incident  
+6. Store and/or trigger alert  
+
+---
+
+## Data Storage
+
+- **Database:** SQLite  
+- **Encryption:** SQLCipher (full-database encryption)  
+
+### Stored Data
+
+- Device ID  
+- Worker ID  
+- Event type  
+- Timestamp  
+- Battery level (if applicable)  
+- Validation metadata  
+
+> Only safety-critical events are persisted.
+
+---
+
+##  Logging
+
+```bash
+RUST_LOG=info cargo run
+
