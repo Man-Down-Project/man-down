@@ -355,9 +355,13 @@ Supports compliance with:
 
 ## Contributors
 
-- @sachariasgj
-- @raspants
-- @daniela1o1
+## Contributors & Main Responsibilities
+
+All contributors have collaborated across the system. The responsibilities below reflect primary areas of contribution.
+
+- **[@sachariasgj](https://github.com/sachariasgj)** — Edge Layer  
+- **[@raspants](https://github.com/raspants)** — Mesh Network  
+- **[@daniela1o1](https://github.com/daniela1o1)** — Fog Backend  
 
 ---
 
