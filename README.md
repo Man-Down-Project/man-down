@@ -135,7 +135,7 @@ All sensor data:
 
 Hierarchical mesh network responsible for **reliable multi-hop communication** between edge devices and the fog layer.
 
- [Detailed documentation](mesh_node/README.md)
+ [Detailed documentation](mesh_node/lib//README.md)
 
 ### Architecture
 
