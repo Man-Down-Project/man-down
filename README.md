@@ -62,7 +62,7 @@ This diagram shows how an event moves through the system from detection to actio
 
 ## Architecture Overview
 
-![System Overview](docs/images/Systemoverview1.png)
+![System Overview](docs/images/SystemOverview1.png)
 
 The system is built as a **fully local, event-driven architecture** consisting of three layers:
 
@@ -88,7 +88,7 @@ All communication flows from edge devices → mesh network → fog layer using s
 
 ## Edge Layer (ESP32, C + FreeRTOS)
 
-![Edge Layer](docs/images/EDGElAYER.png)
+![Edge Layer](docs/images/eDGElAYER.png)
 
 Wearable embedded device responsible for **event detection**, **local safety feedback**, and **secure transmission**.
 
