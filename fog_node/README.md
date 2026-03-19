@@ -166,4 +166,26 @@ Processing steps:
 
 ```bash
 RUST_LOG=info cargo run
+```
 
+---
+
+## Notes
+
+- The system runs fully locally  
+- No cloud services are required  
+- TLS certificates must be generated before startup  
+- Edge devices send binary-encoded events in production  
+
+---
+
+## Summary
+
+The fog node acts as:
+
+- Validation authority  
+- Incident processor  
+- Secure data store  
+- Alert coordinator  
+
+It ensures that safety-critical events are handled quickly, securely, and locally.
