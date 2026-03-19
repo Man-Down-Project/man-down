@@ -125,7 +125,6 @@ mosquitto_pub \
 
 ### **Block 3 – Processing + Storage + Notes**
 
-```md
 ## Event Processing
 
 The fog node handles both:
