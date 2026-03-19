@@ -353,8 +353,6 @@ Supports compliance with:
 
 ---
 
-## Contributors
-
 ## Contributors & Main Responsibilities
 
 All contributors have collaborated across the system. The responsibilities below reflect primary areas of contribution.
