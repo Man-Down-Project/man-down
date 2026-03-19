@@ -13,11 +13,11 @@ pub async fn start_mqtt(
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), DynError> {
     log::info!(
-        "MQTT config: host={} port={} client_id={} topic={} tls={}",
+        "MQTT config: host={} port={} client_id={} topics={:?} tls={}",
         cfg.host,
         cfg.port,
         cfg.client_id,
-        cfg.subscribe_topic,
+        cfg.subscribe_topics,
         cfg.use_tls
     );
 
@@ -28,11 +28,11 @@ pub async fn start_mqtt(
         }
 
         log::info!(
-            "MQTT: connecting to {}:{} as client_id={} topic={}",
+            "MQTT: connecting to {}:{} as client_id={} topics={:?}",
             cfg.host,
             cfg.port,
             cfg.client_id,
-            cfg.subscribe_topic
+            cfg.subscribe_topics,
         );
 
         match run_session(&cfg, &tx, &mut shutdown_rx).await {
@@ -61,11 +61,10 @@ async fn run_session(
     let mqtt_options = build_mqtt_options(cfg)?;
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
-    client
-        .subscribe(&cfg.subscribe_topic, QoS::AtLeastOnce)
-        .await?;
-    log::info!("MQTT: connected and subscribed to {}", cfg.subscribe_topic);
-
+    for topic in &cfg.subscribe_topics {
+        client.subscribe(topic, QoS::AtLeastOnce).await?;
+        log::info!("MQTT: subscribed to {}", topic);
+    }
     loop {
         tokio::select! {
             _ = shutdown_rx.changed() => {

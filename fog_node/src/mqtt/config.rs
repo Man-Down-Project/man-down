@@ -7,7 +7,7 @@ pub struct MqttConfig {
     pub host: String,
     pub port: u16,
     pub client_id: String,
-    pub subscribe_topic: String,
+    pub subscribe_topics: Vec<String>,
 
     pub use_tls: bool,
     pub mesh_node_id: String,
@@ -25,7 +25,12 @@ impl MqttConfig {
         let host = env_or_default("MQTT_HOST", "localhost");
         let port = env_or_default("MQTT_PORT", "8883").parse::<u16>()?;
         let client_id = env_or_default("MQTT_CLIENT_ID", "fog-node");
-        let subscribe_topic = env_or_default("MQTT_TOPIC", "md/v1/device/+/events");
+        let subscribe_topics = env_or_default("MQTT_TOPICS", "md/v1/device/+/events")
+            .split(',')
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
 
         let use_tls = env_or_default("MQTT_USE_TLS", "true").parse::<bool>()?;
         let mesh_node_id = env_or_default("MESH_NODE_ID", "mesh-unknown");
@@ -44,7 +49,7 @@ impl MqttConfig {
             host,
             port,
             client_id,
-            subscribe_topic,
+            subscribe_topics,
             use_tls,
             mesh_node_id,
             ca_path,
