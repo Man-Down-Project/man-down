@@ -64,9 +64,8 @@ certs/
 
 ---
 
-### **Block 2 – Run + Test**
+### Run + Test
 
-```md
 ## TLS Configuration
 
 - Mutual TLS authentication is used  
@@ -89,7 +88,7 @@ localhost:8883 (TLS)
 
 ## Start Fog Backend
 
-Open terminal 2:
+Open **Terminal** 2:
 ```bash
 cargo run
 ```
@@ -102,7 +101,7 @@ MQTT: subscribed
 
 ### Test the System
 
-Open Terminal 3 and publish a test event:
+Open **Terminal 3** and publish a test event:
 ```bash
 mosquitto_pub \
   --cafile certs/ca.crt \
@@ -123,7 +122,7 @@ mosquitto_pub \
 
 ---
 
-### **Block 3 – Processing + Storage + Notes**
+### Processing + Storage + Notes
 
 ## Event Processing
 
@@ -161,11 +160,10 @@ Processing steps:
 
 ---
 
-##  Logging
+## Logging
 
-```bash
-RUST_LOG=info cargo run
-```
+    RUST_LOG=info cargo run
+    RUST_LOG=debug cargo run
 
 ---
 
