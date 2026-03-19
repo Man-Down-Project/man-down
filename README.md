@@ -179,7 +179,7 @@ Stored securely in EEPROM.
 
 Local backend responsible for **event validation**, **classification**, and **secure storage**.
 
- [Detailed documentation](fog_node/lib/README.md) 
+ [Detailed documentation](fog_node/README.md) 
 
 ### Components
 
