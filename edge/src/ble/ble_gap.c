@@ -105,28 +105,28 @@ static int gap_event_connect(struct ble_gap_event *event)
                sizeof(ble_addr_t));
         
         
-        int n_idx = find_node_index(&current_peer_addr);
-        if (n_idx >= 0)
+        int node_index = find_node_index(&current_peer_addr);
+        if (node_index >= 0)
         {
-            nodes[n_idx].fail_count = 0;
-            nodes[n_idx].blacklist_timer = 0;    
+            nodes[node_index].fail_count = 0;
+            nodes[node_index].blacklist_timer = 0;    
         }
         
         ble_state = BLE_STATE_DISCOVERING;
         ESP_LOGI(TAG, "Encryption established");
         
-        if (n_idx >= 0 &&
-            nodes[n_idx].gatt_cached &&
-            nodes[n_idx].tx_handle != 0)
+        if (node_index >= 0 &&
+            nodes[node_index].gatt_cached &&
+            nodes[node_index].tx_handle != 0)
         {
             ESP_LOGI(TAG, "Using cached GATT handles");
 
             gatt_set_handles(
-                nodes[n_idx].svc_start,
-                nodes[n_idx].svc_end,
-                nodes[n_idx].tx_handle,
-                nodes[n_idx].rx_handle,
-                nodes[n_idx].cccd_handle
+                nodes[node_index].svc_start,
+                nodes[node_index].svc_end,
+                nodes[node_index].tx_handle,
+                nodes[node_index].rx_handle,
+                nodes[node_index].cccd_handle
             );
             ble_state = BLE_STATE_SUBSCRIBING;
             gatt_enable_notifications(current_conn_handle);
@@ -217,33 +217,33 @@ static int gap_event_disc(struct ble_gap_event *event)
         return 0;
     }
     
-    int n_idx = find_node_index(&desc->addr);
+    int node_index = find_node_index(&desc->addr);
 
-    if (n_idx >= 0)
+    if (node_index >= 0)
     {
-        if (!nodes[n_idx].valid)
+        if (!nodes[node_index].valid)
         {
-            nodes[n_idx].rssi = desc->rssi;
+            nodes[node_index].rssi = desc->rssi;
         }
         else
         {
-            nodes[n_idx].rssi = 
-                (nodes[n_idx].rssi * (RSSI_SMOOTH_FACTOR -1) + desc->rssi) 
+            nodes[node_index].rssi = 
+                (nodes[node_index].rssi * (RSSI_SMOOTH_FACTOR -1) + desc->rssi) 
                 / RSSI_SMOOTH_FACTOR;
         }
-        nodes[n_idx].last_seen = xTaskGetTickCount();
+        nodes[node_index].last_seen = xTaskGetTickCount();
                 
         if (memcmp(&desc->addr, &current_peer_addr, sizeof(ble_addr_t)) == 0)
         {
-            current_conn_rssi = nodes[n_idx].rssi;
+            current_conn_rssi = nodes[node_index].rssi;
         }
         uint32_t now = xTaskGetTickCount();
 
         bool same_node =
-            ble_addr_cmp(&nodes[n_idx].addr, &current_peer_addr) == 0;
+            ble_addr_cmp(&nodes[node_index].addr, &current_peer_addr) == 0;
         
         bool strong_node =
-            nodes[n_idx].rssi > current_conn_rssi + ROAM_THRESHOLD;
+            nodes[node_index].rssi > current_conn_rssi + ROAM_THRESHOLD;
 
         bool current_node_isweak =
             current_conn_rssi < -75;
@@ -260,9 +260,9 @@ static int gap_event_disc(struct ble_gap_event *event)
             roam_delay_ok)
         {
             ESP_LOGI(TAG, "ROAMING -> [NODE_%d|%02X]: RSSI=%d > current %d", 
-                     n_idx,
-                     get_node_id(&nodes[n_idx].addr),
-                     nodes[n_idx].rssi,
+                     node_index,
+                     get_node_id(&nodes[node_index].addr),
+                     nodes[node_index].rssi,
                      current_conn_rssi);
                 
             last_roam_time = now;
@@ -411,21 +411,21 @@ static int gap_event_enc_change(struct ble_gap_event *event)
         xTimerStop(pairing_timer, 0);
         pairing_start_time = 0;
 
-        int n_idx = find_node_index(&current_peer_addr);
-        if (!pairing_failed && n_idx >= 0)
+        int node_index = find_node_index(&current_peer_addr);
+        if (!pairing_failed && node_index >= 0)
         {
-            nodes[n_idx].fail_count++;
+            nodes[node_index].fail_count++;
 
-            if (nodes[n_idx].fail_count >= MAX_CONNECT_FAILS)
+            if (nodes[node_index].fail_count >= MAX_CONNECT_FAILS)
             {
-                nodes[n_idx].blacklist_timer = 
+                nodes[node_index].blacklist_timer = 
                     xTaskGetTickCount() + NODE_BLACKLIST_TIME;
                 
-                nodes[n_idx].fail_count = 0;
+                nodes[node_index].fail_count = 0;
 
                 ESP_LOGW(TAG, "[Node_%d|%02X] Blacklisted: pairing failure", 
-                         n_idx + 1,
-                         get_node_id(&nodes[n_idx].addr));
+                         node_index + 1,
+                         get_node_id(&nodes[node_index].addr));
             }           
         }
         pairing_failed = false;
@@ -490,11 +490,11 @@ void pairing_timeout_cb(TimerHandle_t xTimer)
 {
     ESP_LOGW(TAG, "Pairing timeout");
 
-    int n_idx = find_node_index(&current_peer_addr);
-    if (n_idx >= 0)
+    int node_index = find_node_index(&current_peer_addr);
+    if (node_index >= 0)
     {   
         pairing_failed = true;
-        node_failure_tracker(n_idx);
+        node_failure_tracker(node_index);
     }
 
     if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE)
@@ -509,19 +509,20 @@ bool ble_tx_pending(void)
 {
     return uxQueueMessagesWaiting(ble_tx_queue) > 0;
 }
+
 void ble_connect(void)
 {
-    int n_idx = get_best_node_index();
-        if (n_idx >= 0)
+    int node_index = get_best_node_index();
+        if (node_index >= 0)
         {
-            ESP_LOGI(TAG, "Connecting to node-%d", n_idx);
+            ESP_LOGI(TAG, "Connecting to node-%d", node_index);
             if (ble_gap_disc_active())
             {
                 ble_gap_disc_cancel();
             }
 
             int rc = ble_gap_connect(own_addr_type,
-                                     &nodes[n_idx].addr,
+                                     &nodes[node_index].addr,
                                      5000,
                                      NULL,
                                      gap_event,

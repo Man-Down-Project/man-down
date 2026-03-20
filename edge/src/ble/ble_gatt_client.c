@@ -218,8 +218,8 @@ static int subscribe_cb(uint16_t conn_handle,
         if (n_idx >= 0) {
             nodes[n_idx].gatt_cached = true;
 
-            ESP_LOGI(TAG, "GATT cached: node=%d svc[%d-%d] tx=%d rx=%d notify=%d",
-                     n_idx,
+            ESP_LOGI(TAG, "GATT cached: node_%d svc[%d-%d] tx=%d rx=%d notify=%d",
+                     n_idx + 1,
                      nodes[n_idx].svc_start,
                      nodes[n_idx].svc_end,
                      nodes[n_idx].tx_handle,

@@ -81,8 +81,6 @@ void buzzer_play(buzzer_pattern_t pattern)
 {
     ESP_LOGI(TAG, "pattern=%d", pattern);
     current_pattern = pattern;
-    
-
 }
 
 void buzzer_init()

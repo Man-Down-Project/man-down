@@ -75,7 +75,7 @@ void ble_send_event(const edge_event_t *event)
             }
             start_scan();
         }
-        //ESP_LOGW(TAG, "TX queue full");
+        ESP_LOGW(TAG, "TX queue full");
     }
     if (current_conn_handle == BLE_HS_CONN_HANDLE_NONE)
     {

@@ -41,10 +41,12 @@ void ble_on_ready(uint16_t conn_handle)
     ble_state = BLE_STATE_READY;
     start_scan();
 }
+
 uint16_t ble_get_conn_handle()
 {
     return current_conn_handle;
 }
+
 static void ble_app_on_sync(void)
 {
     int rc;
@@ -59,11 +61,13 @@ static void ble_app_on_sync(void)
     ble_state = BLE_STATE_SCANNING;
     start_scan(); 
 }
+
 static void ble_host_task(void *param)
 {
     nimble_port_run();
     nimble_port_freertos_deinit();
 }
+
 void ble_init()
 {
     esp_err_t ret;
