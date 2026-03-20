@@ -1,13 +1,15 @@
 use chrono::Duration as ChronoDuration;
 use chrono::{DateTime, Utc};
+use chrono_tz::Europe::Stockholm;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Envelope {
     pub device_id: String,
     pub mesh_node_id: String,
-    pub seq: u64,
-    pub sent_at: DateTime<Utc>,
+    pub seq: u8,
+    pub mesh_timestamp: u16,
+    pub received_at: DateTime<Utc>,
     pub incident: Incident,
 }
 
@@ -15,6 +17,7 @@ pub struct Envelope {
 #[serde(tag = "type")]
 pub enum Incident {
     ManDown { zone_hint: Option<String> },
+    Gas,
     MeshDisconnect { duration_s: u32 },
     Login { worker_id: String },
     Logout { worker_id: String },
@@ -56,8 +59,8 @@ impl Envelope {
         if self.seq == 0 {
             return Err("seq must be > 0".into());
         }
-        if self.sent_at > Utc::now() + ChronoDuration::minutes(5) {
-            return Err("timestamp too far in future".into());
+        if self.received_at > Utc::now() + ChronoDuration::minutes(5) {
+            return Err("received_at too far in future".into());
         }
         Ok(())
     }
@@ -70,54 +73,66 @@ pub struct EdgeEvent {
     pub event_type: u8,
     pub location: u8,
     pub battery: u8,
-    pub seq: u64,
+    pub seq: u8,
+    pub time_stamp: u16,
 }
 
 impl EdgeEvent {
     #[allow(dead_code)]
-    pub const LEN: usize = 12;
+    pub const LEN: usize = 7;
 
     pub fn from_bytes(b: &[u8]) -> Option<Self> {
-        match b.len() {
-            5 => Some(Self {
-                device_id: b[0],
-                event_type: b[1],
-                location: b[2],
-                battery: b[3],
-                seq: b[4] as u64,
-            }),
-
-            12 => {
-                let seq_bytes: [u8; 8] = b[4..12].try_into().ok()?;
-                let seq = u64::from_le_bytes(seq_bytes);
-
-                Some(Self {
-                    device_id: b[0],
-                    event_type: b[1],
-                    location: b[2],
-                    battery: b[3],
-                    seq,
-                })
-            }
-            _ => None,
+        if b.len() != Self::LEN {
+            return None;
         }
+
+        let ts_bytes: [u8; 2] = b[5..7].try_into().ok()?;
+        let time_stamp = u16::from_le_bytes(ts_bytes);
+
+        Some(Self {
+            device_id: b[0],
+            event_type: b[1],
+            location: b[2],
+            battery: b[3],
+            seq: b[4],
+            time_stamp,
+        })
+    }
+
+    pub fn is_heartbeat(&self) -> bool {
+        self.event_type == 0x00
+    }
+
+    pub fn heartbeat_log_line(&self, mesh_node_id: &str, received_at: DateTime<Utc>) -> String {
+        let stockholm_time = received_at.with_timezone(&Stockholm);
+
+        format!(
+            r#"{{"type":"heartbeat","device_id":{},"mesh_node_id":"{}","seq":{},"mesh_timestamp":{},"battery_level":{},"received_at":"{}"}}"#,
+            self.device_id,
+            mesh_node_id,
+            self.seq,
+            self.time_stamp,
+            self.battery,
+            stockholm_time.to_rfc3339()
+        )
     }
 
     pub fn to_envelope(self, mesh_node_id: String) -> Envelope {
         let device_id = self.device_id.to_string();
 
         let incident = match self.event_type {
-            0x00 => Incident::Login {
-                worker_id: device_id.clone(),
-            },
-            0x01 => Incident::Logout {
-                worker_id: device_id.clone(),
-            },
-            0x02 => Incident::ManDown {
+            0x01 => Incident::ManDown {
                 zone_hint: Some(self.location.to_string()),
             },
+            0x02 => Incident::Gas,
             0x03 => Incident::BatteryLow {
                 battery_level: self.battery,
+            },
+            0x04 => Incident::Login {
+                worker_id: device_id.clone(),
+            },
+            0x05 => Incident::Logout {
+                worker_id: device_id.clone(),
             },
             _ => Incident::SensorFault {
                 fault: SensorFault {
@@ -136,7 +151,8 @@ impl EdgeEvent {
             device_id,
             mesh_node_id,
             seq: self.seq,
-            sent_at: Utc::now(),
+            mesh_timestamp: self.time_stamp,
+            received_at: Utc::now(),
             incident,
         }
     }

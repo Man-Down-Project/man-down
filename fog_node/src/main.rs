@@ -82,6 +82,9 @@ async fn process_envelope(env: Envelope) {
         Incident::ManDown { zone_hint } => {
             log::warn!("ManDown! zone_hint={:?}", zone_hint);
         }
+        Incident::Gas => {
+            log::warn!("Gas detected");
+        }
         Incident::MeshDisconnect { duration_s } => {
             log::warn!("MeshDisconnect duration_s={}", duration_s);
         }
