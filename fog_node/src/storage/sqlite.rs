@@ -37,16 +37,18 @@ impl Storage {
                 device_id,
                 mesh_node_id,
                 seq,
-                sent_at,
+                mesh_timestamp,
+                received_at,
                 event_type,
                 incident
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 &env.device_id,
                 &env.mesh_node_id,
                 env.seq,
-                env.sent_at.to_rfc3339(),
+                env.mesh_timestamp,
+                env.received_at.to_rfc3339(),
                 event_type,
                 incident_json,
             ],
@@ -83,14 +85,15 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
             device_id TEXT NOT NULL,
             mesh_node_id TEXT NOT NULL,
             seq INTEGER NOT NULL,
-            sent_at TEXT NOT NULL,
+            mesh_timestamp INTEGER NOT NULL,
+            received_at TEXT NOT NULL,
             event_type TEXT NOT NULL,
             incident TEXT NOT NULL,
             UNIQUE(device_id, seq)
         );
 
         CREATE INDEX IF NOT EXISTS idx_device_time
-        ON events(device_id, sent_at);
+        ON events(device_id, received_at);
         "#,
     )?;
 
@@ -111,6 +114,7 @@ fn ensure_parent_dir(path: &str) -> Result<()> {
 fn event_type(incident: &Incident) -> &'static str {
     match incident {
         Incident::ManDown { .. } => "man_down",
+        Incident::Gas => "gas",
         Incident::MeshDisconnect { .. } => "mesh_disconnect",
         Incident::Login { .. } => "login",
         Incident::Logout { .. } => "logout",
