@@ -1,6 +1,9 @@
 use crate::events::{EdgeEvent, Envelope};
 use crate::mqtt::MqttConfig;
+use chrono::Utc;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::{error::Error, fs::File, io::BufReader, path::Path};
 use tokio::sync::{mpsc::Sender, watch};
 use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
@@ -12,6 +15,8 @@ pub async fn start_mqtt(
     tx: Sender<Envelope>,
     mut shutdown_rx: watch::Receiver<bool>,
 ) -> Result<(), DynError> {
+    std::fs::create_dir_all("logs").ok();
+
     log::info!(
         "MQTT config: host={} port={} client_id={} topics={:?} tls={}",
         cfg.host,
@@ -125,6 +130,25 @@ async fn handle_event(
                 publish.payload.len()
             );
 
+            if let Some(edge) = EdgeEvent::from_bytes(&publish.payload) {
+                let received_at = Utc::now();
+
+                if edge.is_heartbeat() {
+                    let line = edge.heartbeat_log_line(default_mesh_node_id, received_at);
+                    if let Err(e) = write_heartbeat_log(&line) {
+                        log::error!("failed to write heartbeat log: {}", e);
+                    }
+                    return Ok(());
+                }
+
+                let env = edge.to_envelope(default_mesh_node_id.to_string());
+                tx.send(env)
+                    .await
+                    .map_err(|e| format!("processor channel closed: {}", e))?;
+
+                return Ok(());
+            }
+
             match decode_envelope(&publish.payload, default_mesh_node_id) {
                 Ok(env) => {
                     tx.send(env)
@@ -214,4 +238,14 @@ fn load_private_key(path: &Path) -> Result<PrivateKey, DynError> {
     }
 
     Err(format!("No private key found in {}", path.display()).into())
+}
+
+fn write_heartbeat_log(line: &str) -> Result<(), std::io::Error> {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("logs/heartbeat.log")?;
+
+    writeln!(file, "{}", line)?;
+    Ok(())
 }
