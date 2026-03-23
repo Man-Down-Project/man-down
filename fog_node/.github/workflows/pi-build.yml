@@ -1,0 +1,30 @@
+name: Build fog_node for Raspberry Pi Zero 2 W
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-pi32:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust target
+        run: rustup target add armv7-unknown-linux-gnueabihf
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+
+      - name: Build release binary for Raspberry Pi 32-bit
+        run: cross build --release --target armv7-unknown-linux-gnueabihf
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fog_node-armv7-unknown-linux-gnueabihf
+          path: target/armv7-unknown-linux-gnueabihf/release/fog_node
