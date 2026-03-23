@@ -14,6 +14,10 @@ impl Storage {
         log::info!("storage: opening db at {}", path);
         let conn = Connection::open(path)?;
 
+        if let Ok(abs) = std::fs::canonicalize(path) {
+            log::info!("storage: db file resolved to {:?}", abs);
+        }
+
         apply_sqlcipher_key(&conn, key)?;
         verify_database_access(&conn)?;
         configure_connection(&conn)?;
