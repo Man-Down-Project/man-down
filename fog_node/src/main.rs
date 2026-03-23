@@ -60,6 +60,7 @@ async fn run_processor(mut rx: mpsc::Receiver<Envelope>, storage: Storage) {
             continue;
         }
 
+        log::info!("Calling DB insert...");
         if let Err(e) = storage.insert_event(&env) {
             log::error!("Failed to store event: {}", e);
         }

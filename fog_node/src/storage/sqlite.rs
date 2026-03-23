@@ -32,17 +32,25 @@ impl Storage {
 
         let event_type = event_type(&env.incident);
 
-        self.conn.execute(
+        log::info!(
+            "INSERT attempt: device_id={} seq={} mesh_timestamp={} event_type={}",
+            env.device_id,
+            env.seq,
+            env.mesh_timestamp,
+            event_type
+        );
+
+        let rows = self.conn.execute(
             "INSERT OR IGNORE INTO events (
-                device_id,
-                mesh_node_id,
-                seq,
-                mesh_timestamp,
-                received_at,
-                event_type,
-                incident
-            )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            device_id,
+            mesh_node_id,
+            seq,
+            mesh_timestamp,
+            received_at,
+            event_type,
+            incident
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 &env.device_id,
                 &env.mesh_node_id,
@@ -53,6 +61,8 @@ impl Storage {
                 incident_json,
             ],
         )?;
+
+        log::info!("Rows inserted: {}", rows);
 
         Ok(())
     }
