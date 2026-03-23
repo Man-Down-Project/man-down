@@ -101,11 +101,14 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
 }
 
 fn ensure_parent_dir(path: &str) -> Result<()> {
-    if let Some(parent) = Path::new(path).parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .map_err(|_| rusqlite::Error::InvalidPath(parent.to_path_buf()))?;
-        }
+    if let Some(parent) = Path::new(path)
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            log::error!("failed to create db parent dir {}: {}", parent.display(), e);
+            rusqlite::Error::InvalidPath(parent.to_path_buf())
+        })?;
     }
 
     Ok(())
