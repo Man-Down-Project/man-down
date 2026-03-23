@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-cd "$(dirname "$0")"
-./fog_node
+APP_DIR="$(cd "$(dirname "$0")/../../deploy/pi" && pwd)"
+
+echo "Starting fog_node from: $APP_DIR"
+
+cd "$APP_DIR"
+
+exec ./fog_node
