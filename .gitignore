@@ -1,1 +1,6 @@
-deploy/
+deploy/*
+!deploy/pi/
+deploy/pi/*
+!deploy/pi/setup_pi.sh
+!deploy/pi/start.sh
+!deploy/pi/fog_node.service
