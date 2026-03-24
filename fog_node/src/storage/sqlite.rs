@@ -14,10 +14,6 @@ impl Storage {
         log::info!("storage: opening db at {}", path);
         let conn = Connection::open(path)?;
 
-        if let Ok(abs) = std::fs::canonicalize(path) {
-            log::info!("storage: db file resolved to {:?}", abs);
-        }
-
         apply_sqlcipher_key(&conn, key)?;
         verify_database_access(&conn)?;
         configure_connection(&conn)?;
@@ -36,15 +32,7 @@ impl Storage {
 
         let event_type = event_type(&env.incident);
 
-        log::info!(
-            "INSERT attempt: device_id={} seq={} mesh_timestamp={} event_type={}",
-            env.device_id,
-            env.seq,
-            env.mesh_timestamp,
-            event_type
-        );
-
-        let rows = self.conn.execute(
+        self.conn.execute(
             "INSERT OR IGNORE INTO events (
             device_id,
             mesh_node_id,
@@ -65,8 +53,6 @@ impl Storage {
                 incident_json,
             ],
         )?;
-
-        log::info!("Rows inserted: {}", rows);
 
         Ok(())
     }
