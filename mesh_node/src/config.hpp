@@ -12,7 +12,7 @@
 // MQTT client ID and Topics
 //#define MQTT_TOPIC_EVENT "mesh/edge_event"
 
-#define MQTT_TOPIC_EVENT "mesh//node/%d/edge" //For TLS
+#define MQTT_TOPIC_EVENT "mesh/node/%d/edge" //For TLS
 
 //System limits
 #define MAX_PAYLOAD 21
