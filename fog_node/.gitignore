@@ -20,4 +20,8 @@ certs2/
 *.swp
 *~
 
-mosquitto-dev.conf
+mosquitto-clean.conf
+
+data/
+*.db
+logs/
