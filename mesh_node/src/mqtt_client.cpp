@@ -4,6 +4,7 @@
 #include "mqtt_client.hpp"
 #include "config.hpp"
 #include "../certs/ca_cert.hpp"
+#include "time_keeper.hpp"
 
 struct childEvent_t {
     edge_event_out msg;
@@ -32,6 +33,7 @@ void mqtt_init() {
 
     mqttClient.setCallback(mqtt_callback);
 
+    mqttClient.setBufferSize(256);
 
     //choosing broker
     if (NODE_DEPTH == 1){
@@ -125,6 +127,11 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
         pkt->battery,
         pkt->seq
     };
+    msg.timestamp = GetTimeStamp();
+    Serial.println(msg.timestamp);
+    //msg.timestamp = 1234;
+    //Serial.println("timestamp set");
+
     return mqttClient.publish(
         topic,
         (uint8_t*)&msg,

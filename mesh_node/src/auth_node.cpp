@@ -45,7 +45,7 @@ void AuthNode::begin(uint8_t node_id) { //fake for key test, shold be remove lat
 
     _authorized_edge[0].last_seq = 0xFF;
 
-    Serial.println("Fake edge provisioned (device_id = 1)");
+    Serial.println("Edge provisioned (device_id = 1)");
 }
 //test end
 
