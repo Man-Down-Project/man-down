@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <WDT.h>
 #include "ble_gatt_peripheral.hpp"
 #include "config.hpp"
 #include "node.hpp"
@@ -7,9 +8,9 @@
 #include "led_graphics.hpp"
 #include "time_keeper.hpp"
 
-
 bool systemReady = false;
-bool timeInitialized = false;
+bool timeReady = false;
+bool wdTimer = false;
 
 void setup() {
 
@@ -34,18 +35,27 @@ void loop() {
     
     if (!mqttClient.connected() && systemReady == false){
       return;
-    }else if(mqttClient.connected() && systemReady == false){
+    }else if(mqttClient.connected() && timeReady == false){
       
-      delay(1000);
+      delay(500);
 
       TimeInit();
-      systemReady = true;
-      break;
+      timeReady = true;
+
+    }else if (timeReady && systemReady == false){
+      if (WDT.begin(4096)){
+        Serial.println("WD initialized");
+        systemReady = true;
+      }else{
+        Serial.println("WD initialization retry...");
+        return;
+      }
     }
   }
   
   ble_loop(authNode); // hadles BLE events and forwarding via MQTT
   
+  WDT.refresh();
   //TimeSyncDaily();
 }
 
