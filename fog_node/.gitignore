@@ -4,6 +4,8 @@ target/
 # Local certificates
 certs/
 
+certs2/
+
 # Local configuration
 .env
 

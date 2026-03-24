@@ -31,7 +31,6 @@ void loop() {
   mqtt_loop();
   
   while(systemReady == false){
-     //keeps MQTT client alive
     
     if (!mqttClient.connected() && systemReady == false){
       return;
@@ -53,10 +52,11 @@ void loop() {
     }
   }
   
-  ble_loop(authNode); // hadles BLE events and forwarding via MQTT
+  ble_loop(authNode); // handles BLE events and forwarding via MQTT
   
   WDT.refresh();
-  //TimeSyncDaily();
+
+  TimeSyncDaily();
 }
 
 
