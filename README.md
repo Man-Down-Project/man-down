@@ -135,7 +135,7 @@ All sensor data:
 
 Hierarchical mesh network responsible for **reliable multi-hop communication** between edge devices and the fog layer.
 
- [Detailed documentation](mesh_node/lib//README.md)
+ [Detailed documentation](mesh_node/lib/README.md)
 
 ### Architecture
 
@@ -179,7 +179,7 @@ Stored securely in EEPROM.
 
 Local backend responsible for **event validation**, **classification**, and **secure storage**.
 
- [Detailed documentation](fog_node/README.md) 
+ [Detailed documentation](fog/README.md) 
 
 ### Components
 
@@ -213,7 +213,7 @@ md1/v/device/+/events
 
 1. Receive MQTT message  
 2. Parse payload  
-2. Convert to structured envelope  
+3. Convert to structured envelope  
 4. Validate integrity and sequence  
 5. Classify incident  
 6. Trigger action (log / alert / store)  
@@ -314,6 +314,8 @@ RFID will be used for:
 
 ## Local Development (Docker)
 
+> Fully local, real-time IoT safety system with Dockerized simulation and encrypted storage.
+
 For development and testing, the fog layer can be run locally using Docker.
 
 This setup includes:
@@ -329,7 +331,7 @@ sudo docker compose up --build
 
 ### Architecture (Docker)
 
-edge-sim -> mqtt-broker -> fog-node -> encrypted database
+edge-sim -> mqtt-broker -> fog -> database
 
 ---
 
@@ -368,16 +370,43 @@ mosquitto_sub -h localhost -p 1883 -t "mesh/node/#" -v
 Check stored data:
 
 ```bash
-cd fog_node
-sqlcipher data/fog.db
+cd fog
+sqlite3 data/fog.db
 ```
-The database is encrypted using SQLCipher.  
-Use the configured DB key to access it.
+The database is stored using SQLite in the Docker environment.
 
-```bash
-PRAGMA key = '<development-key>;
+```md
+```sql
 SELECT * FROM events ORDER BY id DESC LIMIT 10;
 ``` 
+
+---
+
+### Database (Docker vs Production)
+
+The Docker setup uses a standard SQLite database for simplicity and ease of local development.
+
+This means:
+- No database encryption is applied in the Docker environment
+- Data is stored in plain SQLite format
+
+This choice is intentional to:
+- Reduce setup complexity
+- Avoid platform-specific SQLCipher dependencies in containers
+- Enable quick local testing and debugging
+
+### Production Setup
+
+In the full system (fog layer outside Docker), the database is:
+
+- Encrypted using **SQLCipher**
+- Protected with a configurable encryption key
+- Designed for secure storage of safety-critical data
+
+All sensitive deployments are expected to use SQLCipher with proper key management.
+
+> The Docker environment is intended for development and simulation only  
+> and does not represent the full security configuration of the production system.
 
 ---
 
@@ -402,12 +431,11 @@ mesh/node/test <binary payload>
 
 Verify that events are stored in the fog database:
 ```bash
-cd fog_node
-sqlcipher data/fog.db
+cd fog
+sqlite3 data/fog.db
 ```
 SQL:
 ```bash
-PRAGMA key = '<development-key>';
 SELECT * FROM events ORDER BY id DESC LIMIT 5;
 ```
 
@@ -418,9 +446,9 @@ battery_low
 ``` 
 
 This demonstrates the full pipeline:
-edge-sim → mqtt-broker → fog-node → encrypted storage
+edge-sim → mqtt-broker → fog → storage
 
-No cloud services are required — the entire pipeline runs locally.
+No cloud services are required — the entire pipeline runs locally with low latency and full control over data.
 
 ## Technologies
 
