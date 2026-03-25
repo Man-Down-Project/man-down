@@ -312,6 +312,116 @@ RFID will be used for:
 
 ---
 
+## Local Development (Docker)
+
+For development and testing, the fog layer can be run locally using Docker.
+
+This setup includes:
+- MQTT broker (Mosquitto)
+- Fog backend (Rust)
+- Edge simulator (Python)
+
+### Run the system
+
+```bash
+sudo docker compose up --build
+```
+
+### Architecture (Docker)
+
+edge-sim -> mqtt-broker -> fog-node -> encrypted database
+
+---
+
+
+### Configuration
+
+The Docker setup uses plain MQTT (no TLS):
+
+- MQTT_PORT=1883  
+- MQTT_USE_TLS=false  
+
+This is intended for local development only.
+
+### TLS Setup (Production / Mesh Integration)
+
+For integration with the mesh network:
+
+- MQTT_PORT=8883  
+- MQTT_USE_TLS=true  
+
+Set certificate paths:
+
+- MQTT_CA_PATH  
+- MQTT_CERT_PATH  
+- MQTT_KEY_PATH  
+
+Make sure these match your broker configuration.
+
+### Verify events
+
+Subscribe to events:
+
+```bash
+mosquitto_sub -h localhost -p 1883 -t "mesh/node/#" -v
+```
+Check stored data:
+
+```bash
+cd fog_node
+sqlcipher data/fog.db
+```
+The database is encrypted using SQLCipher.  
+Use the configured DB key to access it.
+
+```bash
+PRAGMA key = '<development-key>;
+SELECT * FROM events ORDER BY id DESC LIMIT 10;
+``` 
+
+---
+
+## Quick Demo
+
+Start the system:
+
+```bash
+sudo docker compose up --build
+```
+In a new Terminal, subscribe to events:
+
+```bash
+mosquitto_sub -h localhost -p 1883 -t "mesh/node/#" -v
+``` 
+You should see events being published continuously from the simulated edge devices.
+
+Example:
+```bash
+mesh/node/test <binary payload>
+```
+
+Verify that events are stored in the fog database:
+```bash
+cd fog_node
+sqlcipher data/fog.db
+```
+SQL:
+```bash
+PRAGMA key = '<development-key>';
+SELECT * FROM events ORDER BY id DESC LIMIT 5;
+```
+
+You should see decoded and classified events such as:
+```bash
+man_down
+battery_low
+``` 
+
+This demonstrates the full pipeline:
+edge-sim → mqtt-broker → fog-node → encrypted storage
+
+No cloud services are required — the entire pipeline runs locally.
+
 ## Technologies
 
 | Layer        | Technology |

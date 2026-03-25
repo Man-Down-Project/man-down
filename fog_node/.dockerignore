@@ -1,0 +1,9 @@
+target
+data
+logs
+.git
+.gitignore
+Dockerfile
+mosquitto-dev.conf
+mosquitto-clean.conf
+.env

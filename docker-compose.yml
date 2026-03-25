@@ -1,0 +1,33 @@
+services:
+  mqtt-broker:
+    container_name: mqtt-broker
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./fog_node/mosquitto-clean.conf:/mosquitto/config/mosquitto.conf
+
+  fog-node:
+    container_name: fog-node
+    build: ./fog_node
+    restart: unless-stopped
+    depends_on:
+      - mqtt-broker
+    environment:
+      MQTT_HOST: mqtt-broker
+      MQTT_PORT: 1883
+      MQTT_USE_TLS: false
+      MQTT_TOPICS: mesh/node/+
+      MQTT_CLIENT_ID: fog-node-docker
+      DB_KEY: 123test
+      DB_PATH: /app/data/fog.db
+    volumes:
+      - ./fog_node/data:/app/data
+
+  edge-sim:
+    container_name: edge-sim
+    build: ./edge_sim
+    restart: unless-stopped
+    depends_on:
+      - mqtt-broker
