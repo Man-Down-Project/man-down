@@ -13,11 +13,15 @@
 #include "ble/ble_internal.h"
 #include "ble/ble_nodes.h"
 #include "ble/ble_gatt_client.h"
+#include "security/provisioning.h"
 
 // Service UUID etc
 static ble_uuid_any_t target_service_uuid;
 static ble_uuid_any_t event_rx_uuid;
 static ble_uuid_any_t ack_tx_uuid;
+static ble_uuid_any_t provisioning_service_uuid;
+static ble_uuid_any_t provisioning_char_uuid;
+static uint16_t provisioning_char_handle = 0;
 
 static const char *TAG = "[BLE_GATT]";
 // GATT variables
@@ -27,6 +31,16 @@ static uint16_t ack_cccd_handle = 0;
 static uint16_t service_end_handle = 0; // storing svc callback
 static uint16_t service_start_handle = 0;
 static uint16_t ack_char_handle = 0;
+static uint16_t provisioning_cccd_handle = 0;
+static uint16_t cccd_handle = 0;
+
+//test variabler
+// static uint16_t normal_svc_start = 0;
+// static uint16_t normal_svc_end   = 0;
+
+static uint16_t prov_svc_start   = 0;
+static uint16_t prov_svc_end     = 0;
+
 
 // Func declarations
 static int gatt_write_cb(uint16_t conn_handle,
@@ -62,7 +76,7 @@ void gatt_set_handles(uint16_t svc_start,
 
     ESP_LOGI(TAG, "GATT handles applied from cache");
     ble_state = BLE_STATE_SUBSCRIBING;
-    gatt_enable_notifications(current_conn_handle);
+    gatt_enable_notifications(current_conn_handle, ack_cccd_handle);
 }
 
 int gatt_svc_cb(uint16_t conn_handle,
@@ -73,6 +87,12 @@ int gatt_svc_cb(uint16_t conn_handle,
     
     if (error->status == 0) {
 
+        if (ble_uuid_cmp(&service->uuid.u, &provisioning_service_uuid.u) == 0) {
+            ESP_LOGI(TAG, "Provisioning service found");
+
+            prov_svc_start = service->start_handle;
+            prov_svc_end   = service->end_handle;
+        }
         ESP_LOGI(TAG, "Service found: start=%d end=%d", service->start_handle, service->end_handle);
         if (ble_uuid_cmp(&service->uuid.u, &target_service_uuid.u) == 0) {
             service_start_handle = service->start_handle;
@@ -88,12 +108,21 @@ int gatt_svc_cb(uint16_t conn_handle,
     }
     else if (error->status == BLE_HS_EDONE) {
         ESP_LOGI(TAG, "Service discovery complete");
-        if (service_start_handle != 0) {
-            ble_gattc_disc_all_chrs(conn_handle,
-                                    service_start_handle,
-                                    service_end_handle,
-                                    gatt_chr_cb,
-                                    NULL);
+        if (provisioning_is_active()) {
+            if (prov_svc_start != 0) {
+                ble_gattc_disc_all_chrs(conn_handle,
+                                        prov_svc_start,
+                                        prov_svc_end,
+                                        gatt_chr_cb,
+                                        NULL);
+            }
+        } else {
+            if(service_start_handle != 0) {
+                ble_gattc_disc_all_chrs(conn_handle,
+                                        1, 0xFFFF,
+                                        gatt_chr_cb,
+                                        NULL);
+            }
         }
     } else {
         ESP_LOGE(TAG, "Service discovery error: %d", error->status);
@@ -106,57 +135,69 @@ static int gatt_chr_cb(uint16_t conn_handle,
                        const struct ble_gatt_chr *chr,
                        void *arg)
 {
-    
     if (error->status == 0) {
-
+        ESP_LOGI(TAG, "Mode: %s",
+                 provisioning_is_active() ? "PROVISIONING" : "NORMAL");
         char uuid_str[BLE_UUID_STR_LEN];
         ble_uuid_to_str(&chr->uuid.u, uuid_str);
-        ESP_LOGI(TAG, "Characteristic UUID: %s", uuid_str);
 
+        ESP_LOGI(TAG, "Characteristic UUID: %s", uuid_str);
         ESP_LOGI(TAG, "Characteristic found: def_handle=%d val_handle=%d",
                  chr->def_handle,
                  chr->val_handle);
         
-        // Check for eventRX (write characteristics)
+        if (provisioning_is_active() &&
+            ble_uuid_cmp(&chr->uuid.u, &provisioning_char_uuid.u) == 0) {
+                provisioning_char_handle = chr->val_handle;
+                ESP_LOGI(TAG, "Provisioning characteristic found!");
+            }
         if (ble_uuid_cmp(&chr->uuid.u, &event_rx_uuid.u) == 0) {
             event_char_handle = chr->val_handle;
             ESP_LOGI(TAG, "eventRX found!");
 
-            int n_idx = find_node_index(&current_peer_addr);
-            if (n_idx >= 0) {
-                nodes[n_idx].tx_handle = event_char_handle;
+            int node_index = find_node_index(&current_peer_addr);
+            if (node_index >= 0) {
+                nodes[node_index].tx_handle = event_char_handle;
             }
         }
-
-        // Check for ackTX (notify characteristic)
         if (ble_uuid_cmp(&chr->uuid.u, &ack_tx_uuid.u) == 0) {
             ack_char_handle = chr->val_handle;
             ESP_LOGI(TAG, "ackTX found!");
 
-            int n_idx = find_node_index(&current_peer_addr);
-            if (n_idx >= 0) {
-                nodes[n_idx].rx_handle = ack_char_handle;
+            int node_index = find_node_index(&current_peer_addr);
+            if (node_index >= 0) {
+                nodes[node_index].rx_handle = ack_char_handle;
             }
         }
+        return 0;
     }
-    else if (error->status == BLE_HS_EDONE) {
-        
+    if (error->status == BLE_HS_EDONE) {
         ESP_LOGI(TAG, "Characteristic discovery complete");
 
-        if (ack_char_handle != 0) {
-            //const char *msg = "HEARTBEAT"; // just here for testing
-            ble_gattc_disc_all_dscs(conn_handle,
-                                    ack_char_handle,
-                                    service_end_handle,
-                                    gatt_dsc_cb,
-                                    NULL);
-
+        if (provisioning_is_active()) {
+            if (provisioning_char_handle != 0) {
+                ble_gattc_disc_all_dscs(conn_handle,
+                                        provisioning_char_handle,
+                                        0xFFFF,
+                                        gatt_dsc_cb,
+                                        NULL);
+            } else {
+                ESP_LOGE(TAG, "Provisioning characteristic not found!");
+            }
         } else {
-            ESP_LOGE(TAG, "Target characteristic not found!");
+            if (ack_char_handle != 0) {
+                ble_gattc_disc_all_dscs(conn_handle,
+                                        ack_char_handle,
+                                        0xFFFF,
+                                        gatt_dsc_cb,
+                                        NULL);
+            } else {
+                ESP_LOGE(TAG, "ACK characteristic not found!");
+            }
         }
-    } else {
-        ESP_LOGE(TAG, "Characteristic discovery error: %d", error->status);
+        return 0;
     }
+    ESP_LOGW(TAG, "Characteristic discovery error: %d", error->status);
     return 0;
 }
 
@@ -182,25 +223,28 @@ static int gatt_dsc_cb(uint16_t conn_handle,
                        const struct ble_gatt_dsc *dsc,
                        void *arg)
 {
-    if (error->status == 0) {
-        if (dsc->uuid.u.type == BLE_UUID_TYPE_16 &&
-            ble_uuid_u16(&dsc->uuid.u) == 0x2902) {
-            // CCCD - Characteristic callback description found
+    if (error->status != 0) {
+        return 0;
+    }
+    if (ble_uuid_u16(&dsc->uuid.u) == 0x2902) {
+            
+        if (provisioning_is_active()) {
+            
+            provisioning_cccd_handle = dsc->handle;
+            ESP_LOGI(TAG, "Provisioning CCCD found -> enabling notify");
+            gatt_enable_notifications(conn_handle, provisioning_cccd_handle);
+        } else {
+
+        
             ack_cccd_handle = dsc->handle;
+            ESP_LOGI(TAG, "ACK CCCD found");
 
             int n_idx = find_node_index(&current_peer_addr);
             if (n_idx >= 0) {
                 nodes[n_idx].cccd_handle = ack_cccd_handle;
             }
-            gatt_enable_notifications(current_conn_handle);
-            // uint16_t enable_notify = 0x0001;
-            // ble_gattc_write_flat(conn_handle,
-            //                      ack_cccd_handle,
-            //                      &enable_notify,
-            //                      sizeof(enable_notify),
-            //                      subscribe_cb,
-            //                      NULL);
-        }
+            gatt_enable_notifications(conn_handle, ack_cccd_handle);
+        }    
     }
     return 0;
 }
@@ -254,6 +298,12 @@ void gatt_client_init()
 
     ble_uuid_from_str(&ack_tx_uuid,
                       "11111111-2222-3333-4444-555555555555");
+    
+    ble_uuid_from_str(&provisioning_service_uuid,
+                      "12345678-1234-1234-1234-1234567890ab");
+    
+    ble_uuid_from_str(&provisioning_char_uuid,
+                      "12345678-1234-1234-1234-1234567890bc");
 }
 
 const ble_uuid_t *gatt_get_service_uuid()
@@ -289,18 +339,18 @@ int gatt_send_event(uint16_t conn_handle, edge_event_t *event)
     return 0;
 }
 
-void gatt_enable_notifications(uint16_t conn_handle)
+void gatt_enable_notifications(uint16_t conn_handle, uint16_t cccd_handle)
 {
-    if (ack_cccd_handle == 0)
+    if (cccd_handle == 0)
     {
         ESP_LOGE(TAG, "CCCD handle missing!");
         return;
     }
     uint16_t enable = 0x0001;
-    ESP_LOGI(TAG, "Re-enabling notifications (CCCD=%d)", ack_cccd_handle);
+    ESP_LOGI(TAG, "Re-enabling notifications (conn=%d), cccd=%d", conn_handle, cccd_handle);
 
     int rc = ble_gattc_write_flat(conn_handle,
-                                  ack_cccd_handle,
+                                  cccd_handle,
                                   &enable,
                                   sizeof(enable),
                                   subscribe_cb,
@@ -309,4 +359,9 @@ void gatt_enable_notifications(uint16_t conn_handle)
     {
         ESP_LOGE(TAG, "Failed to write CCCD: %d", rc);
     }
+}
+
+const ble_uuid_t *gatt_get_provisioning_service_uuid(void)
+{
+    return &provisioning_service_uuid.u;
 }

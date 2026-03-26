@@ -9,6 +9,7 @@
 #include "security/auth.h"
 #include "event/edge_event.h"
 #include "peripherals/battery.h"
+#include "security/provisioning.h"
 
 static edge_event_t tx_packet;
 
@@ -64,7 +65,7 @@ void ble_send_event(const edge_event_t *event)
     ble_tx_msg_t msg;
     msg.event = *event;
 
-    if (xQueueSend(ble_tx_queue, &msg, 0) == pdTRUE)
+    if (xQueueSend(ble_tx_queue, &msg, 0) != pdTRUE)
     {
         if (ble_state == BLE_STATE_SCANNING &&
             current_conn_handle == BLE_HS_CONN_HANDLE_NONE)
@@ -110,7 +111,8 @@ void ble_tx_task(void *arg)
             ble_state == BLE_STATE_READY &&
             notifications_ready &&
             current_conn_handle != BLE_HS_CONN_HANDLE_NONE &&
-            !waiting_for_ack)
+            !waiting_for_ack &&
+            !provisioning_is_active())
         {
             ESP_LOGI(TAG, "TX sending seq=%d (retry=%d)", tx_packet.seq, retry_count);
 

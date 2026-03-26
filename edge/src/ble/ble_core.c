@@ -141,4 +141,18 @@ void ble_init()
     nimble_port_freertos_init(ble_host_task);
 }
 
-
+void ble_restart(void)
+{
+    nimble_port_stop();
+    ble_init();
+}
+void ble_clear_bonds(void)
+{
+    ble_store_clear();
+}
+void ble_disconnect(void)
+{
+    if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE) {
+        ble_gap_terminate(current_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+    }
+}

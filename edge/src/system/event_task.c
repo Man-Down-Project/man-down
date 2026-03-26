@@ -2,6 +2,9 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "nvs_flash.h"
+#include "esp_system.h"
+#include "esp_log.h"
 
 #include "system_events.h"
 #include "peripherals/buzzer.h"
@@ -33,7 +36,7 @@ static void handle_event(system_event_t *ev)
             break;
         
         case EVENT_BUTTON_LONG:
-            
+            led_set(RGB_MAGENTA, LED_MODE_SOLID);
             buzzer_play(BUZZER_GAS);
             edge_trigger_event(EVENT_GASLARM, 90);
             break;
@@ -58,6 +61,14 @@ static void handle_event(system_event_t *ev)
             buzzer_play(BUZZER_FALL);
             edge_trigger_event(EVENT_FALLARM, 75);
             break;
+        case EVENT_BUTTON_POWER:
+            led_set(RGB_MAGENTA, LED_MODE_BLINK);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            nvs_flash_erase();
+            esp_restart();
+
+
+
         
         default:
             break;

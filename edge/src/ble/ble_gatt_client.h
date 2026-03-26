@@ -19,6 +19,6 @@ void gatt_set_handles(uint16_t svc_start,
                       uint16_t event_handle,
                       uint16_t ack_handle,
                       uint16_t cccd_handle);
-void gatt_enable_notifications(uint16_t conn_handle);
-
+void gatt_enable_notifications(uint16_t conn_handle, uint16_t cccd_handle);
+const ble_uuid_t *gatt_get_provisioning_service_uuid(void);
 #endif

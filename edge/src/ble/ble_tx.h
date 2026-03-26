@@ -19,6 +19,7 @@ extern TimerHandle_t heartbeat_timer;
 extern volatile bool gatt_busy;
 extern bool tx_packet_pending;
 extern uint8_t sequence_counter;
+extern bool waiting_for_ack;
 
 void ble_send_event(const edge_event_t *event);
 void ble_tx_task(void *arg);

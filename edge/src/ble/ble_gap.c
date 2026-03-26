@@ -23,6 +23,7 @@
 #include "ble/ble.h"
 #include "ble/ble_tx.h"
 #include "ble/ble_gap.h"
+#include "security/provisioning.h"
 //#include "system/system_events.h"
 
 // --------------------------------------------------------------------------
@@ -33,7 +34,7 @@ static struct ble_gap_disc_params scan_params = {
         .itvl = 0x40,
         .window = 0x30,
         .filter_policy = 0,
-        .passive = 1,
+        .passive = 0,
         .limited = 0,
         .filter_duplicates = 1
 };
@@ -84,7 +85,10 @@ static int gap_event_connect(struct ble_gap_event *event)
 {
     struct ble_gap_conn_desc desc;
     notifications_ready = false;
-        
+
+    if (provisioning_is_active()) {
+        provisioning_on_connected(event->connect.conn_handle);
+    }        
     if (event->connect.status == 0) 
     {
         ble_state = BLE_STATE_CONNECTED;
@@ -128,8 +132,7 @@ static int gap_event_connect(struct ble_gap_event *event)
                 nodes[node_index].rx_handle,
                 nodes[node_index].cccd_handle
             );
-            ble_state = BLE_STATE_SUBSCRIBING;
-            gatt_enable_notifications(current_conn_handle);
+            ble_state = BLE_STATE_SUBSCRIBING;   
         }
         else
         {
@@ -173,6 +176,11 @@ static int gap_event_connect(struct ble_gap_event *event)
 static int gap_event_disconnect(struct ble_gap_event *event)
 {
     xTimerStop(pairing_timer, 0);
+    tx_packet_pending = false;
+    waiting_for_ack = false;
+    gatt_busy = false;
+    notifications_ready = false;
+
     current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     current_conn_rssi = -127;
         
@@ -189,12 +197,39 @@ static int gap_event_disconnect(struct ble_gap_event *event)
 static int gap_event_disc(struct ble_gap_event *event)
 {        
     struct ble_gap_disc_desc *desc = &event->disc;
+    
+    if (!provisioning_is_active()) {
+        goto normal_flow;
+    }
+    if (desc->length_data == 0 || desc->data == NULL)
+        return 0;
     struct ble_hs_adv_fields fields;
+    memset(&fields, 0, sizeof(fields));
+
+    int rc = ble_hs_adv_parse_fields(&fields, desc->data, desc->length_data);
+    if (rc != 0)
+        return 0;
+
+    const ble_uuid_t *prov_uuid = gatt_get_provisioning_service_uuid();
+    
+    if (fields.num_uuids128 > 0) {
+        for (int i = 0; i < fields.num_uuids128; i++) {
+            if (ble_uuid_cmp(&fields.uuids128[i].u, prov_uuid) == 0) {
+                ESP_LOGI(TAG, "Found provisioning device");
+                ble_gap_disc_cancel();
+                provisioning_on_scan_match(&desc->addr);
+                return 0;
+            }
+        }
+    }
+    return 0;
+
+normal_flow:
     
     if (desc->rssi < -120 || desc->rssi > 20)
         return 0;
     
-    int rc = ble_hs_adv_parse_fields(&fields, desc->data, desc->length_data);
+    rc = ble_hs_adv_parse_fields(&fields, desc->data, desc->length_data);
 
     if (rc != 0)
     {
@@ -445,7 +480,22 @@ static int gap_event_notify(struct ble_gap_event *event)
 {
     struct os_mbuf *om = event->notify_rx.om;
 
-    int len = OS_MBUF_PKTLEN(om);
+    uint16_t len = OS_MBUF_PKTLEN(om);
+    uint8_t buffer[128];
+
+    if (len > sizeof(buffer)) {
+        ESP_LOGW(TAG, "Notify too large (%d)", len);
+        return 0;
+    }
+    int rc = ble_hs_mbuf_to_flat(om, buffer, sizeof(buffer), &len);
+    if (rc != 0) {
+        ESP_LOGE(TAG, "Failed to flatten mbuf (%d)", rc);
+        return 0;
+    }
+    if (provisioning_is_active()) {
+        provisioning_handle_rx(buffer, len);
+        return 0;
+    }
 
     if (len < sizeof(edge_ack_t))
     {
@@ -453,7 +503,7 @@ static int gap_event_notify(struct ble_gap_event *event)
         return 0;
     }
     edge_ack_t ack;
-    os_mbuf_copydata(om, 0, sizeof(edge_ack_t), &ack);
+    memcpy(&ack, buffer, sizeof(edge_ack_t));
 
     ESP_LOGI(TAG, "ACK seq=%d status =%d", ack.seq, ack.status);
     
@@ -534,4 +584,16 @@ void ble_connect(void)
             }
         }
         start_scan();
+}
+
+void ble_gap_connect_to(const ble_addr_t *addr)
+{
+    ble_gap_connect(
+        own_addr_type,
+        addr,
+        30000,
+        NULL,
+        gap_event,
+        NULL
+    );
 }

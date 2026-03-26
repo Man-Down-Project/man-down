@@ -16,7 +16,7 @@
 #define DOUBLE_PRESS_MS 400
 #define LONG_PRESS_MS 1000
 #define LONG_RESET_MS 3000
-#define LONG_POWER_MS 20000
+#define LONG_POWER_MS 10000
 #define DEBOUNCE_MS 50
 
 static bool waiting_double_press = false;
@@ -115,7 +115,10 @@ static void button_task(void *arg)
         {
             system_event_post(EVENT_BUTTON_DOUBLE, 0);
         }
-        
+        else if (state == BUTTON_POWER) 
+        {
+            system_event_post(EVENT_BUTTON_POWER, 0);
+        }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

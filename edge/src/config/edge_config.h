@@ -78,4 +78,11 @@ typedef enum {
     BLE_STATE_SUBSCRIBING
 } ble_state_t;
 
+typedef enum {
+    MODE_PROVISIONING,
+    MODE_NORMAL
+} device_mode_t;
+
+extern device_mode_t device_mode;
+
 #endif

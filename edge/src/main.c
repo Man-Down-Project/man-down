@@ -4,6 +4,7 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "nvs_flash.h"
 
 
 #include "ble/ble.h"
@@ -15,6 +16,7 @@
 #include "peripherals/sensors/accelerometer.h"
 #include "system/system_events.h"
 #include "system/event_task.h"
+#include "security/provisioning.h"
 
 
 static const char *TAG = "MAIN";
@@ -23,6 +25,8 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Starting application");
     
+    nvs_flash_init();
+    provisioning_init();
     event_task_init();
     ble_init();
     accelerometer_init();
