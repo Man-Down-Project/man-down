@@ -5,10 +5,6 @@
 #include <NTPClient.h>
 #include <time.h>
 
-//The NTP client
-//extern WiFiUDP* udp;
-//extern NTPClient* timeClient;
-
 //time tracker
 extern unsigned long baseEpoch;
 extern unsigned long lastMillis;

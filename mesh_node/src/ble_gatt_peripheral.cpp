@@ -60,7 +60,6 @@ void ble_poll(AuthNode &auth){
     BLE.poll();
     
     if (!eventRX.written()) return;
-    //Serial.println(sizeof(edge_event_t));
     uint8_t buf[sizeof(edge_event_t)];
     int len = eventRX.valueLength();
     eventRX.readValue(buf, len);

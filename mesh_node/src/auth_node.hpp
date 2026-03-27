@@ -10,7 +10,7 @@ struct eeprom_edge_t {
     uint8_t device_id;
     uint8_t shared_key[KEY_LEN];
     uint8_t last_seq;
-    uint32_t key_timestamp; //for key update purposes (mabeY shold liv in fog?)
+    uint32_t key_timestamp; //format MMDDHHMM
 }; 
 
 class AuthNode{
@@ -28,6 +28,9 @@ public:
     bool removeEdge(uint8_t device_id); // remove edge from autorized list
 
     void persistEdge(uint8_t index); // store authorized edge from RAM to EEPROM
+
+    bool isStorageEmpty();
+
 
 private:
     uint8_t _node_id;

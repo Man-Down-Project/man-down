@@ -129,8 +129,6 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
     };
     msg.timestamp = GetTimeStamp();
     Serial.println(msg.timestamp);
-    //msg.timestamp = 1234;
-    //Serial.println("timestamp set");
 
     return mqttClient.publish(
         topic,
@@ -158,7 +156,7 @@ void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int len
 void mqtt_callback(char* topic, byte* payload, unsigned int length){
     mqtt_provision_handeling(topic, payload, length);
 
-    //can add other message handler here....
+    //can add other provision topic handler here....
 }
 
 bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id) {

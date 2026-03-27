@@ -2,6 +2,9 @@
 #include "personal_setup.hpp"
 #include "../certs/ca_cert.hpp"
 
+//System mode switch
+#define USE_EEPROM  1 
+
 
 //node config
 #define NODE_ID 1
@@ -10,13 +13,10 @@
 #define NODE_DEPTH 1
 
 // MQTT client ID and Topics
-//#define MQTT_TOPIC_EVENT "mesh/edge_event"
-
 #define MQTT_TOPIC_EVENT "mesh/node/%d/edge" //For TLS
 
 //System limits
 #define MAX_PAYLOAD 21
-//#define MAX_DATA_PACKETS_PER_SESSION 25 //noun handeling and validation
 #define AUTH_TAG_LEN 8 
 #define KEY_LEN 16
 #define EEPROM_START 0
