@@ -143,7 +143,26 @@ bool AuthNode::removeEdge(uint8_t device_id) {
     return false;
 }
 
+void AuthNode::edgeEnrollmentFromSerial(){
+    
+    uint8_t buffer[21];
+    uint8_t idx = 0;
 
+    while(idx < sizeof(buffer)){
+        if(Serial.available()){
+            buffer[idx++] = Serial.read();
+        }
+    }
+
+    //packet parsing
+    uint8_t device_id = buffer[0];
+    uint8_t* key = &buffer[1];
+    uint32_t timestamp =
+    ((uint32_t)buffer[17] << 24) |
+    ((uint32_t)buffer[18] << 16) |
+    ((uint32_t)buffer[19] << 8)  |
+    ((uint32_t)buffer[20]);
+}
 
 void AuthNode::persistEdge(uint8_t index) {
     if (index >= MAX_APPROVED_EDGE) return;

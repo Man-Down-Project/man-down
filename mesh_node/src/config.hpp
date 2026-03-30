@@ -2,7 +2,7 @@
 #include "personal_setup.hpp"
 #include "../certs/ca_cert.hpp"
 
-//System mode switch
+//EEPROM Configuration
 #define USE_EEPROM  1 
 
 
