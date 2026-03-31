@@ -1,5 +1,5 @@
 use chrono::Datelike;
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{Timelike, Utc};
 use chrono_tz::Europe::Stockholm;
 
 use super::models::{EdgeIdList, HmacState};

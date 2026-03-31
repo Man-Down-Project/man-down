@@ -25,3 +25,4 @@ mosquitto-clean.conf
 data/
 *.db
 logs/
+state/

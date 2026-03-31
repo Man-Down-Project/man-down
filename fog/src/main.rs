@@ -8,12 +8,13 @@ use crate::app_config::AppConfig;
 use crate::events::{Envelope, Incident};
 use crate::mqtt::OutgoingMessage;
 use crate::mqtt::start_mqtt;
-use crate::provisioning::manager::build_edge_id_payload;
-use crate::provisioning::manager::{build_hmac_edge_payload, build_hmac_mesh_payload};
+use crate::provisioning::manager::{
+    build_ca_payload, build_edge_id_payload, build_hmac_edge_payload, build_hmac_mesh_payload,
+};
 use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
+use crate::provisioning::state::{load_hmac_state, save_hmac_state};
 use crate::storage::Storage;
 use chrono::Utc;
-use rumqttc::Outgoing;
 use std::fs;
 use tokio::sync::{mpsc, watch};
 
@@ -25,11 +26,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let config = AppConfig::from_env()?;
     //let storage = Storage::new(&config.db_path, &config.db_key)?;
 
-    let provisioning_state = ProvisioningState {
-        hmac: HmacState {
+    let hmac = if let Some(existing) = load_hmac_state() {
+        log::info!("Loaded existing HMAC from disk");
+        existing
+    } else {
+        log::info!("Generating new HMAC");
+
+        let new = HmacState {
             key_hex: "9A4F21C75513E8026DB933A17C4D90EE".to_string(),
             created_at: Utc::now(),
-        },
+        };
+
+        let _ = save_hmac_state(&new);
+        new
+    };
+
+    let provisioning_state = ProvisioningState {
+        hmac,
         edge_ids: EdgeIdList {
             ids: vec!["01".to_string(), "02".to_string(), "03".to_string()],
         },
@@ -50,6 +63,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .send(OutgoingMessage {
             topic: "mesh/provisioning/edgeid".to_string(),
             payload: edge_payload,
+        })
+        .await;
+
+    let ca_payload = build_ca_payload(&provisioning_state.ca.pem);
+
+    let _ = outgoing_tx
+        .send(OutgoingMessage {
+            topic: "mesh/provisioning/ca".to_string(),
+            payload: ca_payload,
         })
         .await;
 
