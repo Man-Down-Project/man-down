@@ -9,9 +9,11 @@ use crate::events::{Envelope, Incident};
 use crate::mqtt::OutgoingMessage;
 use crate::mqtt::start_mqtt;
 use crate::provisioning::manager::build_edge_id_payload;
+use crate::provisioning::manager::{build_hmac_edge_payload, build_hmac_mesh_payload};
 use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
 use crate::storage::Storage;
 use chrono::Utc;
+use rumqttc::Outgoing;
 use std::fs;
 use tokio::sync::{mpsc, watch};
 
@@ -48,6 +50,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .send(OutgoingMessage {
             topic: "mesh/provisioning/edgeid".to_string(),
             payload: edge_payload,
+        })
+        .await;
+
+    let hmac_mesh_payload = build_hmac_mesh_payload(&provisioning_state.hmac);
+
+    let _ = outgoing_tx
+        .send(OutgoingMessage {
+            topic: "mesh/provisioning/hmac".to_string(),
+            payload: hmac_mesh_payload,
+        })
+        .await;
+
+    let hmac_edge_payload = build_hmac_edge_payload(&provisioning_state.hmac);
+
+    let _ = outgoing_tx
+        .send(OutgoingMessage {
+            topic: "edge/provisioning/hmac".to_string(),
+            payload: hmac_edge_payload,
         })
         .await;
     let mqtt_tx = tx.clone();
