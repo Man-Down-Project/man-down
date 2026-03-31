@@ -375,7 +375,6 @@ sqlite3 data/fog.db
 ```
 The database is stored using SQLite in the Docker environment.
 
-```md
 ```sql
 SELECT * FROM events ORDER BY id DESC LIMIT 10;
 ``` 
