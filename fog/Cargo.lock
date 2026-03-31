@@ -183,7 +183,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fog_node"
+name = "fog"
 version = "0.1.0"
 dependencies = [
  "chrono",

@@ -1,11 +1,11 @@
 use crate::events::{EdgeEvent, Envelope};
-use crate::mqtt::MqttConfig;
+use crate::mqtt::{MqttConfig, OutgoingMessage};
 use chrono::Utc;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::{error::Error, fs::File, io::BufReader, path::Path};
-use tokio::sync::{mpsc::Sender, watch};
+use tokio::sync::{mpsc, mpsc::Sender, watch};
 use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
 
 type DynError = Box<dyn Error + Send + Sync>;
@@ -14,6 +14,7 @@ pub async fn start_mqtt(
     cfg: MqttConfig,
     tx: Sender<Envelope>,
     mut shutdown_rx: watch::Receiver<bool>,
+    mut outgoing_rx: tokio::sync::mpsc::Receiver<OutgoingMessage>,
 ) -> Result<(), DynError> {
     std::fs::create_dir_all("logs").ok();
 
@@ -40,7 +41,7 @@ pub async fn start_mqtt(
             cfg.subscribe_topics,
         );
 
-        match run_session(&cfg, &tx, &mut shutdown_rx).await {
+        match run_session(&cfg, &tx, &mut shutdown_rx, &mut outgoing_rx).await {
             Ok(()) => {
                 log::info!("MQTT: session stopped cleanly");
                 return Ok(());
@@ -62,6 +63,7 @@ async fn run_session(
     cfg: &MqttConfig,
     tx: &Sender<Envelope>,
     shutdown_rx: &mut watch::Receiver<bool>,
+    outgoing_rx: &mut tokio::sync::mpsc::Receiver<OutgoingMessage>,
 ) -> Result<(), DynError> {
     let mqtt_options = build_mqtt_options(cfg)?;
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
@@ -76,6 +78,13 @@ async fn run_session(
                 if is_shutdown_requested(shutdown_rx) {
                     log::info!("MQTT: shutdown signal received");
                     return Ok(());
+                }
+            }
+
+            msg = outgoing_rx.recv() => {
+                if let Some(msg) = msg{
+                    println!("PUBLISHING TO MQTT: {}", msg.topic);
+                    client.publish(msg.topic, QoS::AtLeastOnce, true, msg.payload).await?;
                 }
             }
 

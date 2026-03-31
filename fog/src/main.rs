@@ -1,12 +1,18 @@
 mod app_config;
 mod events;
 mod mqtt;
+mod provisioning;
 mod storage;
 
 use crate::app_config::AppConfig;
 use crate::events::{Envelope, Incident};
+use crate::mqtt::OutgoingMessage;
 use crate::mqtt::start_mqtt;
+use crate::provisioning::manager::build_edge_id_payload;
+use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
 use crate::storage::Storage;
+use chrono::Utc;
+use std::fs;
 use tokio::sync::{mpsc, watch};
 
 #[tokio::main]
@@ -15,32 +21,54 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     env_logger::init();
 
     let config = AppConfig::from_env()?;
-    let storage = Storage::new(&config.db_path, &config.db_key)?;
+    //let storage = Storage::new(&config.db_path, &config.db_key)?;
+
+    let provisioning_state = ProvisioningState {
+        hmac: HmacState {
+            key_hex: "9A4F21C75513E8026DB933A17C4D90EE".to_string(),
+            created_at: Utc::now(),
+        },
+        edge_ids: EdgeIdList {
+            ids: vec!["01".to_string(), "02".to_string(), "03".to_string()],
+        },
+        ca: CaCert {
+            pem: fs::read_to_string(&config.mqtt.ca_path)?,
+        },
+    };
 
     log::info!("MQTT broker: {}:{}", config.mqtt.host, config.mqtt.port);
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
+    let edge_payload = build_edge_id_payload(&provisioning_state.edge_ids);
+
+    let _ = outgoing_tx
+        .send(OutgoingMessage {
+            topic: "mesh/provisioning/edgeid".to_string(),
+            payload: edge_payload,
+        })
+        .await;
     let mqtt_tx = tx.clone();
     let shutdown_rx = shutdown_rx.clone();
     let mqtt_config = config.mqtt.clone();
 
     let mqtt_task = tokio::spawn(async move {
-        if let Err(e) = start_mqtt(mqtt_config, mqtt_tx, shutdown_rx).await {
+        if let Err(e) = start_mqtt(mqtt_config, mqtt_tx, shutdown_rx, outgoing_rx).await {
             log::error!("MQTT task exited with error: {}", e);
         }
     });
 
-    let processor = run_processor(rx, storage);
+    //let processor = run_processor(rx, storage);
 
     tokio::select! {
         _= tokio::signal::ctrl_c() => {
            log::info!("Ctrl+C received, shutting down...");
         }
-        _= processor => {
-            log::info!("Processor exited");
-        }
+        //_= processor => {
+        //    log::info!("Processor exited");
+        //}
     }
 
     let _ = shutdown_tx.send(true);
