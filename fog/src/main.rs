@@ -8,11 +8,10 @@ use crate::app_config::AppConfig;
 use crate::events::{Envelope, Incident};
 use crate::mqtt::OutgoingMessage;
 use crate::mqtt::start_mqtt;
-use crate::provisioning::manager::{
-    build_ca_payload, build_edge_id_payload, build_hmac_edge_payload, build_hmac_mesh_payload,
-};
+use crate::provisioning::manager::{build_initial_provisioning_messages, generate_hmac_key_hex};
 use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
-use crate::provisioning::state::{load_hmac_state, save_hmac_state};
+use crate::provisioning::scheduler::run_hmac_rotation_scheduler;
+use crate::provisioning::state::{hmac_needs_rotation, load_hmac_state, save_hmac_state};
 use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
@@ -27,13 +26,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //let storage = Storage::new(&config.db_path, &config.db_key)?;
 
     let hmac = if let Some(existing) = load_hmac_state() {
-        log::info!("Loaded existing HMAC from disk");
-        existing
+        if hmac_needs_rotation(&existing) {
+            log::info!("Existing HMAC is older than 7 days, generating new HMAC");
+
+            let new = HmacState {
+                key_hex: generate_hmac_key_hex(),
+                created_at: Utc::now(),
+            };
+
+            let _ = save_hmac_state(&new);
+            new
+        } else {
+            log::info!("Loaded existing HMAC from disk");
+            existing
+        }
     } else {
-        log::info!("Generating new HMAC");
+        log::info!("No HMAC found on disk, generating new HMAC");
 
         let new = HmacState {
-            key_hex: "9A4F21C75513E8026DB933A17C4D90EE".to_string(),
+            key_hex: generate_hmac_key_hex(),
             created_at: Utc::now(),
         };
 
@@ -57,41 +68,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
-    let edge_payload = build_edge_id_payload(&provisioning_state.edge_ids);
+    let scheduler_tx = outgoing_tx.clone();
+    let scheduler_task = tokio::spawn(async move {
+        run_hmac_rotation_scheduler(scheduler_tx).await;
+    });
 
-    let _ = outgoing_tx
-        .send(OutgoingMessage {
-            topic: "mesh/provisioning/edgeid".to_string(),
-            payload: edge_payload,
-        })
-        .await;
-
-    let ca_payload = build_ca_payload(&provisioning_state.ca.pem);
-
-    let _ = outgoing_tx
-        .send(OutgoingMessage {
-            topic: "mesh/provisioning/ca".to_string(),
-            payload: ca_payload,
-        })
-        .await;
-
-    let hmac_mesh_payload = build_hmac_mesh_payload(&provisioning_state.hmac);
-
-    let _ = outgoing_tx
-        .send(OutgoingMessage {
-            topic: "mesh/provisioning/hmac".to_string(),
-            payload: hmac_mesh_payload,
-        })
-        .await;
-
-    let hmac_edge_payload = build_hmac_edge_payload(&provisioning_state.hmac);
-
-    let _ = outgoing_tx
-        .send(OutgoingMessage {
-            topic: "edge/provisioning/hmac".to_string(),
-            payload: hmac_edge_payload,
-        })
-        .await;
     let mqtt_tx = tx.clone();
     let shutdown_rx = shutdown_rx.clone();
     let mqtt_config = config.mqtt.clone();
@@ -101,6 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             log::error!("MQTT task exited with error: {}", e);
         }
     });
+
+    publish_initial_provisioning(&outgoing_tx, &provisioning_state).await;
 
     //let processor = run_processor(rx, storage);
 
@@ -119,8 +102,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let _ = mqtt_task.await;
 
+    scheduler_task.abort();
+
     log::info!("Shutdown complete");
     Ok(())
+}
+
+async fn publish_initial_provisioning(
+    outgoing_tx: &mpsc::Sender<OutgoingMessage>,
+    state: &ProvisioningState,
+) {
+    let messages = build_initial_provisioning_messages(state);
+
+    for msg in messages {
+        if let Err(e) = outgoing_tx.send(msg).await {
+            log::error!("Failed to queue initial provisioning message: {}", e);
+        }
+    }
 }
 
 async fn run_processor(mut rx: mpsc::Receiver<Envelope>, storage: Storage) {

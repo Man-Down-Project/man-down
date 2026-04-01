@@ -19,3 +19,5 @@ dotenvy = "0.15"
 
 tokio-rustls = "0.24"
 rustls-pemfile = "1"
+rand = "0.8"
+hex = "0.4"
