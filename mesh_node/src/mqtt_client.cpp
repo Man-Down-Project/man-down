@@ -89,8 +89,7 @@ void mqtt_handle_connection() {
     if (mqttClient.connect(client_id, "", "")) {
         Serial.println("MQTT connected");
 
-        snprintf(provision_topic, sizeof(provision_topic),
-                "mesh/node/%d/provision/ca", NODE_ID);
+        const char* provision_topic = "mesh/provisioning/#";
 
         mqttClient.subscribe(provision_topic);
         Serial.println("Attempting to subscribe to provisioning topic...");
@@ -149,7 +148,7 @@ void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int len
         handle_hmac_provision(payload, length);
 
     }else if (strcmp(topic, "mesh/provisioning/ca") == 0){
-        
+
         Serial.println("Provisioning: New CA received");
 
         char newCA[length +1];
@@ -204,19 +203,38 @@ void handle_edgeid_provision(byte* payload, unsigned int length){
 
 void handle_hmac_provision(byte* payload, unsigned int len){
     
-    if(len >=40){
+    char buffer[41];
+
+    if(len != 40 || len > 40){
         Serial.println("Invalid HMAC length");
         return;
     }
     
+    memcpy(buffer, payload, 40);
+
     char keyStr[33];
     char tsStr[9];
 
-    memcpy(keyStr, payload, 32);
+    Serial.print("HMAC topic len: ");
+    Serial.println(len);
+
+    Serial.print("Payload: ");
+    for (unsigned int i = 0; i < len; i++) {
+        Serial.print((char)payload[i]);
+    }
+    Serial.println();
+
+    memcpy(keyStr, buffer, 32);
     keyStr[32] = '\0';
 
-    memcpy(tsStr, payload + 32, 8);
+    Serial.print("Key: ");
+    Serial.println(keyStr);
+
+    memcpy(tsStr, buffer + 32, 8);
     tsStr[8] = '\0';
+
+    Serial.print("TS: ");
+    Serial.println(tsStr);
 
 
     for(int i = 0; i < 8; i++){
