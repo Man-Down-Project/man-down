@@ -10,7 +10,7 @@
 
 struct __attribute__ ((packed)) global_auth{
     uint8_t shared_key[KEY_LEN];
-    uint32_t key_timestamp; //format MMDDHHM
+    uint32_t key_timestamp; //format MMDDHHMm
 };
 
 struct __attribute__ ((packed)) eeprom_global_auth{

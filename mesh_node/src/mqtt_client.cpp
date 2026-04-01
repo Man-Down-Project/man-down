@@ -164,8 +164,7 @@ void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int len
         
 }
 
-void handle_hmac_provision(byte* payload, unsigned int length){
-}
+
 
 void handle_edgeid_provision(byte* payload, unsigned int length){
     char buffer[128];
@@ -198,6 +197,43 @@ void handle_edgeid_provision(byte* payload, unsigned int length){
     }
 
     authNode.commitWhitelistIfChange(provisioned, count);
+
+}
+
+void handle_hmac_provision(byte* payload, unsigned int len){
+    
+    if(len >=40){
+        Serial.println("Invalid HMAC length");
+        return;
+    }
+    
+    char keyStr[33];
+    char tsStr[9];
+
+    memcpy(keyStr, payload, 32);
+    keyStr[32] = '\0';
+
+    memcpy(tsStr, payload + 32, 8);
+    tsStr[8] = '\0';
+
+
+    for(int i = 0; i < 8; i++){
+        if(tsStr[i] < '0' || tsStr[i] > '9'){
+            Serial.println("Invalid timestamp format");
+            return;
+        } 
+    }
+
+    uint32_t timestamp = strtoul(tsStr, nullptr, 10);
+
+    uint8_t key[16];
+
+    if(!hexStringToByte(keyStr, key, 16)){
+        Serial.println("Invalid HMAC key format");
+        return;
+    }
+
+    authNode.updateGlobalKey(key, timestamp);
 
 }
 

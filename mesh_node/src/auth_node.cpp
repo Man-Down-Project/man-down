@@ -147,7 +147,6 @@ bool AuthNode::removeDeviceFromWhitelist(uint8_t device_id) {
     return false; //Device not found
 }
 
-
 int whitelistCompare(const uint8_t a[],int aLen, const uint8_t b[],int bLen, uint8_t out[]){
 
     int outIndex = 0;
@@ -191,7 +190,6 @@ int whitelistCompare(const uint8_t a[],int aLen, const uint8_t b[],int bLen, uin
 
 }
 
-
 int AuthNode::countWhitelist(){
     int count = 0;
 
@@ -202,7 +200,6 @@ int AuthNode::countWhitelist(){
     }
     return count;
 }
-
 
 void AuthNode::commitWhitelistIfChange(uint8_t* provisionedList, int provCount){
 
@@ -261,6 +258,38 @@ void AuthNode::updateGlobalKey(uint8_t* new_key, uint32_t new_ts){
     memcpy(_ram_auth.auth.shared_key, new_key, KEY_LEN);
     _ram_auth.auth.key_timestamp = new_ts;
     persistEEPROM();
+}
+
+bool hexCharToByte(char c, uint8_t &out){
+    if(c >= '0' && c <= '9') out = c - '0';
+    else if(c >= 'A' && c <= 'F') out = c -'A' +10;
+    else if(c >= 'a' && c <= 'f') out = c -'a' +10;
+    else return false;
+
+    return true;
+}
+
+bool hexStringToByte(const char* str, uint8_t* out, size_t outLen){
+    if(!str)
+        return false;
+    
+    size_t len = strlen(str);
+    if(len != outLen * 2)
+        return false;
+
+    for(int i = 0; i < outLen; i++){
+        uint8_t hi, lo;
+
+        if(!hexCharToByte(str[i * 2], hi))
+            return false;
+
+        if(!hexCharToByte(str[i * 2 + 1], lo))
+            return false;
+
+        out[i] = hi << 4 | lo;
+    }
+
+    return true;
 }
 
 void AuthNode::AuthEnrollmentFromSerial(){

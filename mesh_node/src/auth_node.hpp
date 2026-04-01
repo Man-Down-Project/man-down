@@ -40,6 +40,8 @@ private:
 
 int whitelistCompare(const uint8_t a[],int aLen, const uint8_t b[],int bLen, uint8_t out[]);
 bool constTimeComp(const uint8_t* a, const uint8_t* b, size_t len);
+bool hexCharToByte(char c, uint8_t &out);
+bool hexStringToByte(const char* str, uint8_t* out, size_t outLen);
 
 extern AuthNode authNode;
 extern eeprom_global_auth _eeprom;
