@@ -5,7 +5,7 @@ use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::{error::Error, fs::File, io::BufReader, path::Path};
-use tokio::sync::{mpsc, mpsc::Sender, watch};
+use tokio::sync::{mpsc::Sender, watch};
 use tokio_rustls::rustls::{Certificate, ClientConfig, PrivateKey, RootCertStore};
 
 type DynError = Box<dyn Error + Send + Sync>;
