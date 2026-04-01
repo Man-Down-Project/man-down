@@ -10,17 +10,22 @@ AuthNode authNode;
 AuthNode::AuthNode() {
 
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
-        _authorized_edge[i].device_id = 0xFF;
-        _authorized_edge[i].last_seq = 0;
-        _authorized_edge[i].key_timestamp = 0;
-        memset(_authorized_edge[i].shared_key, 0, KEY_LEN);
+        _ram_auth.device_whitelist[i] = EMPTY_ID;
+        _ram_auth.last_seq[i] = 0xFF;
     }
+
+    memset(_ram_auth.auth.shared_key, 0, KEY_LEN);
+    _ram_auth.auth.key_timestamp = 0;
 }
 
 
 bool AuthNode::isStorageEmpty(){
+
+    if(_ram_auth.auth.key_timestamp != 0)
+        return false;
+
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_authorized_edge[i].device_id != 0xFF){
+        if(_ram_auth.device_whitelist[i] != EMPTY_ID){
             return false;
         }
     }
@@ -28,7 +33,7 @@ bool AuthNode::isStorageEmpty(){
 }
 
 
-void AuthNode::begin(uint8_t node_id) {  //This is the live code
+void AuthNode::begin(uint8_t node_id) { 
     _node_id = node_id;
 
     loadAuthorizedEdges();
@@ -44,10 +49,22 @@ void AuthNode::begin(uint8_t node_id) {  //This is the live code
 
 
 
-void AuthNode::loadAuthorizedEdges() { //live code
-    for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
-        int addr = EEPROM_START + i * sizeof(eeprom_edge_t); 
-        EEPROM.get(addr, _authorized_edge[i]);
+void AuthNode::loadAuthorizedEdges() { 
+    EEPROM.get(0, _ram_auth);
+
+    if(_ram_auth.magic != EEPROM_MAGIC || _ram_auth.version != EEPROM_VERSION){
+        Serial.println("EEPROM invalid, resetting..");
+
+        memset(&_ram_auth, 0, sizeof(_ram_auth));
+
+        _ram_auth.magic = EEPROM_MAGIC;
+        _ram_auth.version = EEPROM_VERSION;
+        _ram_auth.auth.key_timestamp = 0;
+
+        for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+            _ram_auth.device_whitelist[i] = EMPTY_ID;
+        }
+        EEPROM.put(0, _ram_auth);
     }
 }
 
@@ -66,109 +83,228 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 
     uint8_t device_id = pkt->device_id;
     uint8_t seq = pkt->seq;
+    
+    int idx = -1;
 
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) { // detect duplication
-        if (_authorized_edge[i].device_id == device_id) {
+        if (_ram_auth.device_whitelist[i] == device_id) {
+            idx = i;
+            break;
+        }
+    }
+    
+    if(idx == -1)
+        return false;
 
-            if (_authorized_edge[i].key_timestamp == 0) {
-                return false; // not provisioned
+    uint8_t last =_ram_auth.last_seq[idx];
+
+    if(last != 0xFF && seq == last)
+        return false;
+    
+
+    SHA256 sha;
+    uint8_t full_hash[32];
+    uint8_t computed_tag[AUTH_TAG_LEN];
+
+    //sha.resetHMAC(_ram_auth.auth.shared_key, KEY_LEN);
+    sha.update((uint8_t*)pkt, offsetof(edge_event_t,  auth_tag));
+    sha.finalizeHMAC(_ram_auth.auth.shared_key, KEY_LEN, full_hash, 32);
+
+    memcpy(computed_tag, full_hash, AUTH_TAG_LEN);
+
+    // compare computed HMAC with received auth_tag
+    if (!constTimeComp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN)) {
+
+        Serial.println("Auth tag mismatch!");
+
+        return false;
+    }
+    _ram_auth.last_seq[idx] = seq;
+
+    return true;
+}
+
+
+bool AuthNode::addDeviceToWhitelist(uint8_t device_id){
+    for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+        if(_ram_auth.device_whitelist[i] == EMPTY_ID){
+            _ram_auth.device_whitelist[i] = device_id;
+            return true;
+        }
+    }
+
+    return false; // List pace full
+}
+
+
+bool AuthNode::removeDeviceFromWhitelist(uint8_t device_id) {
+    for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+        if(_ram_auth.device_whitelist[i] == device_id){
+            _ram_auth.device_whitelist[i] = EMPTY_ID;
+            return true;
+        }
+    }
+    return false; //Device not found
+}
+
+
+int whitelistCompare(const uint8_t a[],int aLen, const uint8_t b[],int bLen, uint8_t out[]){
+
+    int outIndex = 0;
+
+    for(int i = 0; i < aLen; i++){
+        
+        if(a[i] == EMPTY_ID)
+            continue;
+
+        bool found = false;
+
+        for(int j = 0; j < bLen; j++){
+            if(b[j] == EMPTY_ID)
+            continue;
+
+            if(a[i] == b[j]){
+                found = true;
+                break;
             }
-            
-            if (_authorized_edge[i].last_seq == seq) // check duplicate sequence
-                return false;
-         
-            // --- HMAC verification ---
-            SHA256 sha;
-            uint8_t full_hash[32];
-            uint8_t computed_tag[AUTH_TAG_LEN];
+        }
 
-            sha.resetHMAC(_authorized_edge[i].shared_key, KEY_LEN);
-            sha.update((uint8_t*)pkt, offsetof(edge_event_t,  auth_tag));
-            sha.finalizeHMAC(_authorized_edge[i].shared_key, KEY_LEN, full_hash, AUTH_TAG_LEN);
-            memcpy(computed_tag, full_hash, AUTH_TAG_LEN);
+        //duplicate protection from provision packet
+        if(!found){ 
+            bool existsInOutput = false;
 
-            // compare computed HMAC with received auth_tag
-            if (!constTimeComp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN)) {
-                Serial.println("Auth tag mismatch!");
-
-                Serial.print("Computed: ");
-                for (int j = 0; j < AUTH_TAG_LEN; j++) {
-                    Serial.print(computed_tag[j], HEX); Serial.print(" ");
+            for(int k = 0; k < outIndex; k++){
+                if(out[k] == a[i]){
+                    existsInOutput = true;
+                    break;
                 }
-                Serial.println();
-
-                Serial.print("Received: ");
-                for (int j = 0; j < AUTH_TAG_LEN; j++) {
-                    Serial.print(pkt->auth_tag[j], HEX); Serial.print(" ");
-                }
-                Serial.println();
-
-                return false;
             }
+            //add new edge_id to add list
+            if(!existsInOutput)
+                out[outIndex++] = a[i];
+        }
+        
+      
+    }
 
-            _authorized_edge[i].last_seq = seq; // update sequence in RAM
-            return true;
+    return outIndex;
+
+}
+
+
+int AuthNode::countWhitelist(){
+    int count = 0;
+
+    for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+        if(_ram_auth.device_whitelist[i] != EMPTY_ID){
+            count++;
+        }
+    }
+    return count;
+}
+
+
+void AuthNode::commitWhitelistIfChange(uint8_t* provisionedList, int provCount){
+
+    uint8_t addList[MAX_APPROVED_EDGE];
+    uint8_t removeList[MAX_APPROVED_EDGE];
+
+    int curentCount = countWhitelist();
+
+    int addCount = whitelistCompare(provisionedList, provCount, _ram_auth.device_whitelist, curentCount, addList);
+
+    int removeCount = whitelistCompare(_ram_auth.device_whitelist, curentCount, provisionedList, provCount, removeList);
+
+    int finalCount = curentCount -removeCount + addCount;
+
+    if(finalCount > MAX_APPROVED_EDGE){
+        Serial.println("Whitelist update rejected: risk of overflow");
+        return;
+    }
+    
+    for(int i = 0; i < removeCount; i++){
+        removeDeviceFromWhitelist(removeList[i]);
+    }    
+    
+    
+    for(int i = 0; i < addCount; i++){
+        addDeviceToWhitelist(addList[i]);
+    }
+
+    persistEEPROM();
+
+}
+
+
+void AuthNode::updateGlobalKey(uint8_t* new_key, uint32_t new_ts){
+    if(!new_key) return;
+
+    if(new_ts == 0){
+        Serial.println("Invalid timestamp");
+        return;
+    }
+
+    bool allZero = true;
+
+    for(int i = 0; i < KEY_LEN; i++){
+        if(new_key[i] != 0){
+            allZero = false;
+            break;
         }
     }
 
-    return false; // unauthorized device
-}
-
-bool AuthNode::updateEdgeKey(uint8_t device_id, uint8_t* new_key, uint32_t new_ts) {
-    if (!new_key) return false;
-
-    for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
-        if (_authorized_edge[i].device_id == device_id) {
-            memcpy(_authorized_edge[i].shared_key, new_key, KEY_LEN);
-            _authorized_edge[i].last_seq = 0;
-            _authorized_edge[i].key_timestamp = new_ts;
-            persistEdge(i);
-            return true;
-        }
+    if(allZero){
+        Serial.println("Zero key rejected");
+        return;
     }
-    return false; //device not found
+
+    memcpy(_ram_auth.auth.shared_key, new_key, KEY_LEN);
+    _ram_auth.auth.key_timestamp = new_ts;
+    persistEEPROM();
 }
 
-bool AuthNode::removeEdge(uint8_t device_id) {
-    for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
-        if (_authorized_edge[i].device_id == device_id) {
-            _authorized_edge[i].device_id = 0xFF;
-            _authorized_edge[i].last_seq = 0;
-            _authorized_edge[i].key_timestamp = 0;
-            memset(_authorized_edge[i].shared_key, 0, KEY_LEN);
-            persistEdge(i);
-            return true;
-        }
-    }
-    return false;
-}
-
-void AuthNode::edgeEnrollmentFromSerial(){
+void AuthNode::AuthEnrollmentFromSerial(){
     
     uint8_t buffer[21];
     uint8_t idx = 0;
+    unsigned long start = millis();
 
     while(idx < sizeof(buffer)){
         if(Serial.available()){
             buffer[idx++] = Serial.read();
         }
+
+        delay(1);
+
+        if(millis() - start > 3000){
+            Serial.println("Provision timeout");
+            return;
+        }
     }
 
     //packet parsing
     uint8_t device_id = buffer[0];
-    uint8_t* key = &buffer[1];
-    uint32_t timestamp =
+    uint8_t* new_key = &buffer[1];
+    uint32_t new_ts =
     ((uint32_t)buffer[17] << 24) |
     ((uint32_t)buffer[18] << 16) |
     ((uint32_t)buffer[19] << 8)  |
     ((uint32_t)buffer[20]);
+
+    if(device_id == EMPTY_ID){
+        Serial.println("Invalid device id");
+        return;
+    }
+
+    updateGlobalKey(new_key, new_ts);
+
+    addDeviceToWhitelist(device_id);
+
+    Serial.println("Serial provision complete");
 }
 
-void AuthNode::persistEdge(uint8_t index) {
-    if (index >= MAX_APPROVED_EDGE) return;
-
-    int addr = EEPROM_START + index * sizeof(eeprom_edge_t);
-    EEPROM.put(addr, _authorized_edge[index]);
+void AuthNode::persistEEPROM() {
+    EEPROM.put(0, _ram_auth);
 
 }
 
@@ -182,15 +318,15 @@ void AuthNode::begin(uint8_t node_id) { //fake for key test, shold be remove lat
 
     // Clear all authorized edges first
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
-        _authorized_edge[i].device_id = 0xFF;  // mark unused
-        _authorized_edge[i].last_seq = 0xFF;
-        _authorized_edge[i].key_timestamp = 1;
+        _ram_auth.device_whitelist[i].device_id = 0xFF;  // mark unused
+        _ram_auth.device_whitelist[i].last_seq = 0xFF;
+        _ram_auth.device_whitelist[i].key_timestamp = 1;
     }
 
     // ----- FAKE FOG PROVISIONING -----
 
     // We authorize ONE edge device (device_id = 1)
-    _authorized_edge[0].device_id = 1;
+    _ram_auth.device_whitelist[0].device_id = 1;
 
     uint8_t fake_key[KEY_LEN] = {
         0x9A, 0x4F, 0x21, 0xC7,
@@ -199,9 +335,9 @@ void AuthNode::begin(uint8_t node_id) { //fake for key test, shold be remove lat
         0x7C, 0x4D, 0x90, 0xEE
     };
 
-    memcpy(_authorized_edge[0].shared_key, fake_key, KEY_LEN);
+    memcpy(_ram_auth.device_whitelist[0].shared_key, fake_key, KEY_LEN);
 
-    _authorized_edge[0].last_seq = 0xFF;
+    _ram_auth.device_whitelist[0].last_seq = 0xFF;
 
     Serial.println("Edge provisioned (device_id = 1)");
 }

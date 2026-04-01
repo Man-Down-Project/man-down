@@ -5,6 +5,7 @@
 #include "config.hpp"
 #include "../certs/ca_cert.hpp"
 #include "time_keeper.hpp"
+#include "auth_node.hpp"
 
 struct childEvent_t {
     edge_event_out msg;
@@ -139,24 +140,70 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
 
 void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int length) {
 
-    if (strcmp(topic, "mesh/provision/ca") != 0)
+    if(strcmp(topic, "mesh/provisioning/edgeid") == 0){
+        handle_edgeid_provision(payload, length);
+
+    }else if(strcmp(topic, "mesh/provisioning/hmac") == 0){
+        handle_hmac_provision(payload, length);
+
+    }else if (strcmp(topic, "mesh/provisioning/ca") == 0){
+
+        Serial.println("Provisioning: New CA received");
+
+        char newCA[length +1];
+        memcpy(newCA, payload, length);
+        newCA[length] = '\0';
+
+        Serial.println("Rebooting to apply new CA...");
+        delay(500);
+        NVIC_SystemReset();
+    }else{
         return;
-    Serial.println("Provisioning: New CA received");
+    }
 
-    char newCA[length +1];
-    memcpy(newCA, payload, length);
-    newCA[length] = '\0';
-
-    Serial.println("Rebooting to apply new CA...");
-    delay(500);
-    NVIC_SystemReset();
-    
+        
 }
+
+void handle_hmac_provision(byte* payload, unsigned int length){
+}
+
+void handle_edgeid_provision(byte* payload, unsigned int length){
+    char buffer[128];
+
+    if(length >= sizeof(buffer))
+        return;
+
+    memcpy(buffer, payload, length);
+    buffer[length] = '\0';
+
+    uint8_t provisioned[MAX_APPROVED_EDGE];
+
+    for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+        provisioned[i] = EMPTY_ID;
+    }
+
+    int count = 0;
+
+    char* token = strtok(buffer, ",");
+
+    while(token != nullptr && count < MAX_APPROVED_EDGE){
+        
+        int id = atoi(token);
+
+        if(id > 0 && id < 255){
+            provisioned[count++] = (uint8_t)id;
+        }
+
+        token = strtok(nullptr, ",");
+    }
+
+    authNode.commitWhitelistIfChange(provisioned, count);
+
+}
+
 
 void mqtt_callback(char* topic, byte* payload, unsigned int length){
     mqtt_provision_handeling(topic, payload, length);
-
-    //can add other provision topic handler here....
 }
 
 bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id) {

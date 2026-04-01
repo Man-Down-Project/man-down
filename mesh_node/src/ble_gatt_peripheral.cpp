@@ -84,7 +84,6 @@ void ble_poll(AuthNode &auth){
       return;
     }
 
-    //uint8_t* shared_key = _authorized_edges[device_id].shared_key;
 
     Serial.print("Packet from device: ");
     Serial.print(device_id);

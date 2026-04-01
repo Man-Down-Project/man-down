@@ -18,8 +18,10 @@ struct __attribute__ ((packed)) eeprom_global_auth{
     uint8_t version;
 
     uint8_t device_whitelist[MAX_APPROVED_EDGE];
+    uint8_t last_seq[MAX_APPROVED_EDGE];
     global_auth auth;
-};  
+};
 
 extern eeprom_global_auth _eeprom;
+
 

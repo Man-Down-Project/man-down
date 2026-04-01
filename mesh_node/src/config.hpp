@@ -6,6 +6,7 @@
 #define USE_EEPROM  1 
 
 
+
 //node config
 #define NODE_ID 1
 #define PARENT_IP "192.168.0.2"
