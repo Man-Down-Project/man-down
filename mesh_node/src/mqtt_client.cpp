@@ -93,7 +93,7 @@ void mqtt_handle_connection() {
                 "mesh/node/%d/provision/ca", NODE_ID);
 
         mqttClient.subscribe(provision_topic);
-        Serial.println("Subscribed to provisioning topic...");
+        Serial.println("Attempting to subscribe to provisioning topic...");
 
     }else{
         Serial.print("MQTT failed: ");
@@ -141,13 +141,15 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
 void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int length) {
 
     if(strcmp(topic, "mesh/provisioning/edgeid") == 0){
+        Serial.println("Initiating Whitelist provisioning");
         handle_edgeid_provision(payload, length);
 
     }else if(strcmp(topic, "mesh/provisioning/hmac") == 0){
+        Serial.println("Initiating HMAC key provisioning");
         handle_hmac_provision(payload, length);
 
     }else if (strcmp(topic, "mesh/provisioning/ca") == 0){
-
+        
         Serial.println("Provisioning: New CA received");
 
         char newCA[length +1];
