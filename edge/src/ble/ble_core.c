@@ -146,10 +146,12 @@ void ble_restart(void)
     nimble_port_stop();
     ble_init();
 }
+
 void ble_clear_bonds(void)
 {
     ble_store_clear();
 }
+
 void ble_disconnect(void)
 {
     if (current_conn_handle != BLE_HS_CONN_HANDLE_NONE) {

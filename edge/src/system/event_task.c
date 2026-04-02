@@ -61,15 +61,13 @@ static void handle_event(system_event_t *ev)
             buzzer_play(BUZZER_FALL);
             edge_trigger_event(EVENT_FALLARM, 75);
             break;
+            
         case EVENT_BUTTON_POWER:
             led_set(RGB_MAGENTA, LED_MODE_BLINK);
             vTaskDelay(pdMS_TO_TICKS(500));
             nvs_flash_erase();
             esp_restart();
 
-
-
-        
         default:
             break;
     }
