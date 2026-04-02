@@ -164,12 +164,28 @@ Hierarchical mesh network responsible for **reliable multi-hop communication** b
 
 ### Provisioning
 
-Managed from fog layer via MQTT:
+Managed from fog layer via MQTT.
 
-- Edge keys  
-- Certificates  
+The fog layer distributes:
 
-Stored securely in EEPROM.
+- Edge identifiers  
+- CA certificates  
+- HMAC keys (with rotation support)
+
+### MQTT Topics
+
+- mesh/provisioning/edgeid  
+- mesh/provisioning/ca  
+- mesh/provisioning/hmac  
+- edge/provisioning/hmac  
+
+Payload format and protocol details are defined in:
+
+docs/provisioning.md
+
+Provisioning data is stored securely in EEPROM on mesh nodes.
+
+Provisioning is initiated by the fog layer and consumed by mesh and edge devices.
 
 ---
 

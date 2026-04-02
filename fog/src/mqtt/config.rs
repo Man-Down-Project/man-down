@@ -12,6 +12,9 @@ pub struct MqttConfig {
     pub use_tls: bool,
     pub mesh_node_id: String,
 
+    pub username: String,
+    pub password: String,
+
     pub ca_path: PathBuf,
     pub client_cert_path: PathBuf,
     pub client_key_path: PathBuf,
@@ -35,6 +38,8 @@ impl MqttConfig {
         let use_tls = env_or_default("MQTT_USE_TLS", "true").parse::<bool>()?;
         let mesh_node_id = env_or_default("MESH_NODE_ID", "mesh-unknown");
 
+        let username = env_or_default("MQTT_USERNAME", "fog_user");
+        let password = env_or_default("MQTT_PASSWORD", "dev");
         let ca_path = PathBuf::from(env_or_default("MQTT_CA_PATH", "certs/ca.crt"));
         let client_cert_path = PathBuf::from(env_or_default("MQTT_CERT_PATH", "certs/fog.crt"));
         let client_key_path =
@@ -52,6 +57,8 @@ impl MqttConfig {
             subscribe_topics,
             use_tls,
             mesh_node_id,
+            username,
+            password,
             ca_path,
             client_cert_path,
             client_key_path,

@@ -26,3 +26,7 @@ data/
 *.db
 logs/
 state/
+
+# MQTT local broker files
+passwordfile
+aclfile

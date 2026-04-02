@@ -100,6 +100,8 @@ fn build_mqtt_options(cfg: &MqttConfig) -> Result<MqttOptions, DynError> {
     let mut options = MqttOptions::new(&cfg.client_id, &cfg.host, cfg.port);
     options.set_keep_alive(cfg.keep_alive);
 
+    options.set_credentials(cfg.username.clone(), cfg.password.clone());
+
     if cfg.use_tls {
         let tls_config =
             build_tls_config(&cfg.ca_path, &cfg.client_cert_path, &cfg.client_key_path)?;
