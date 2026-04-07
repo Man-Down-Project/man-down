@@ -34,7 +34,7 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-            
+
       - name: Build release binary for Raspberry Pi 32-bit
         run: cross build --release --target armv7-unknown-linux-gnueabihf
       
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fog-armv7-unknown-linux-gnueabihf
-          path: target/armv7-unknown-linux-gnueabihf/release/fog
+          path: fog/target/armv7-unknown-linux-gnueabihf/release/fog
           
