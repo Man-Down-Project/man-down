@@ -26,6 +26,7 @@
 #include "ble/ble_tx.h"
 #include "ble/ble_gatt_client.h"
 #include "system/system_events.h"
+#include "peripherals/led.h"
 
 static const char *TAG = "[BLE_CORE]";
 
@@ -35,6 +36,11 @@ int last_connect_index = -1;
 int current_conn_rssi = -127;
 uint8_t own_addr_type;
 ble_state_t ble_state = BLE_STATE_IDLE;
+
+static void heartbeat_led_off_cb(TimerHandle_t xTimer)
+{
+    led_off();
+}
 
 void ble_on_ready(uint16_t conn_handle)
 {
@@ -93,14 +99,14 @@ void ble_init()
 
     ble_hs_cfg.sync_cb = ble_app_on_sync;
     // Enable Secure connection (BLE)
-    ble_hs_cfg.sm_sc = 0;
+    ble_hs_cfg.sm_sc = 1;
 
 // Enable bonding (store keys in NVS)
-    ble_hs_cfg.sm_bonding = 0;
+    ble_hs_cfg.sm_bonding = 1;
 
 // No MITM (not sure what this does yet. guessing on = 1 off = 0)
 // defaults back to legacy if not supported by the device
-    ble_hs_cfg.sm_mitm = 0;
+    ble_hs_cfg.sm_mitm = 1;
 
 // No input/output capability
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
@@ -135,6 +141,7 @@ void ble_init()
                                  pdFALSE,
                                  NULL,
                                  pairing_timeout_cb);
+    
     // ========================================
     // Start NimBLE host task (need to be last)
     // ========================================

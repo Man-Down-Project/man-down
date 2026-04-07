@@ -23,6 +23,8 @@ static uint32_t duty_current;
 static rgb_color_t current_color;
 static rgb_color_t led_color = RGB_OFF;
 static led_mode_t led_mode = LED_MODE_OFF;
+static portMUX_TYPE led_mux = portMUX_INITIALIZER_UNLOCKED;
+
 
 static void channel_init(int gpio, ledc_channel_t ch)
 {
@@ -89,23 +91,30 @@ static void led_task(void *arg)
         {
             case LED_MODE_SOLID:
                 rgb_led_set(led_color);
-                vTaskDelay(pdMS_TO_TICKS(200));
+                vTaskDelay(pdMS_TO_TICKS(100));
                 break;
             
             case LED_MODE_BLINK:
                 rgb_led_set(led_color);
                 vTaskDelay(pdMS_TO_TICKS(200));
-
                 rgb_led_set(RGB_OFF);
                 vTaskDelay(pdMS_TO_TICKS(200));
                 break;
             
+            case LED_MODE_PULSE:
+                rgb_led_set(led_color);
+                vTaskDelay(pdMS_TO_TICKS(150));
+                rgb_led_set(RGB_OFF);
+                led_mode = LED_MODE_OFF;
+                break;
+
             case LED_MODE_OFF:
                 rgb_led_set(RGB_OFF);
                 vTaskDelay(pdMS_TO_TICKS(500));
                 break;
             default:
-                vTaskDelay(pdMS_TO_TICKS(200));
+                rgb_led_set(RGB_OFF);
+                vTaskDelay(pdMS_TO_TICKS(100));
         }   
     }
 }
@@ -133,12 +142,19 @@ void led_init(void)
                 "led_task",
                 2048,
                 NULL,
-                1,
+                3,
                 NULL);
 }
 
 void led_set(rgb_color_t color, led_mode_t mode)
 {
+    taskENTER_CRITICAL(&led_mux);
     led_color = color;
     led_mode  = mode;
+    taskEXIT_CRITICAL(&led_mux);
+}
+
+void led_off(void) 
+{
+    led_set(RGB_OFF, LED_MODE_OFF);
 }

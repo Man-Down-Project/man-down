@@ -1,6 +1,7 @@
 #include "esp_event.h"
 
 #include "config/edge_config.h"
+#include "ble/ble_core.h"
 #include "ble/ble_internal.h"
 #include "ble/ble_tx.h"
 #include "ble/ble_gatt_client.h"
@@ -9,6 +10,7 @@
 #include "security/auth.h"
 #include "event/edge_event.h"
 #include "peripherals/battery.h"
+#include "peripherals/led.h"
 #include "security/provisioning.h"
 
 static edge_event_t tx_packet;
@@ -163,5 +165,10 @@ void heartbeat_timer_cb(TimerHandle_t xTimer)
 {
     battery_set(99);
     edge_trigger_event(EVENT_HEARTBEAT, battery_get());
+
+    if (!provisioning_is_active())
+    {       
+        led_set(RGB_GREEN, LED_MODE_PULSE);  
+    }
 }
 

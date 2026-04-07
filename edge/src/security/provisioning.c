@@ -6,6 +6,8 @@
 #include "ble/ble_core.h"
 #include "ble/ble_gap.h"
 #include "ble/ble_gatt_client.h"
+#include "peripherals/led.h"
+#include "esp_system.h"
 
 #define HMAC_KEY_SIZE 16
 static const char *TAG = "[PROVISION]";
@@ -18,6 +20,11 @@ void provisioning_init(void)
     ESP_LOGI(TAG, "Key exists: %s", has_key ? "YES" : "NO");
     active = !has_key;
     ESP_LOGI(TAG, "Provisioning mode: %s", active ? "ON" : "OFF");
+
+    if (active)
+    {
+        led_set(RGB_MAGENTA, LED_MODE_BLINK);
+    }
 }
 
 bool provisioning_is_active(void)
@@ -36,6 +43,7 @@ void provisioning_on_connected(uint16_t conn_handle)
 {
     if (!active) return;
     ESP_LOGI(TAG, "Connected for provisioning");
+    led_set(RGB_MAGENTA, LED_MODE_SOLID);
 }
 
 void provisioning_handle_rx(const uint8_t *data, size_t len)
@@ -50,9 +58,13 @@ void provisioning_handle_rx(const uint8_t *data, size_t len)
     auth_store_key(data, len);
 
     ESP_LOGI(TAG, "Provisioning complete!");
-    active = false;
+    ESP_LOGI(TAG, "Restarting device!");
     
+    active = false;
     ble_clear_bonds();
     ble_disconnect();
-    start_scan();
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();
+    
 }
+

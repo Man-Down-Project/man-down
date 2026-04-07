@@ -18,11 +18,13 @@ typedef enum {
     LED_MODE_OFF,
     LED_MODE_SOLID,
     LED_MODE_BLINK,
-    LED_MODE_BREATHE
+    LED_MODE_BREATHE,
+    LED_MODE_PULSE
 } led_mode_t;
 
 void led_init(void);
 void led_set(rgb_color_t color, led_mode_t mode);
+void led_off(void);
 
 
 #endif

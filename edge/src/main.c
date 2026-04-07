@@ -18,7 +18,6 @@
 #include "system/event_task.h"
 #include "security/provisioning.h"
 
-
 static const char *TAG = "MAIN";
 
 void app_main(void)

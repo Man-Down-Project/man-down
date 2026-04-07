@@ -88,6 +88,12 @@ static int gap_event_connect(struct ble_gap_event *event)
 
     if (provisioning_is_active()) {
         provisioning_on_connected(event->connect.conn_handle);
+
+        ESP_LOGI(TAG, "Starting secure pairing for provisioning");
+        int rc = ble_gap_security_initiate(event->connect.conn_handle);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "Security initiation failed: %d", rc);
+        }
     }        
     if (event->connect.status == 0) 
     {
@@ -432,20 +438,26 @@ static int gap_event_disc_complete(struct ble_gap_event *event)
 
 static int gap_event_enc_change(struct ble_gap_event *event)
 {
-    ESP_LOGI(TAG, "enc status=%d", event->enc_change.status);
+    
+    int status = event->enc_change.status;
+    ESP_LOGI(TAG, "Encryption status=%d", status);
     gatt_client_reset();
-        
-    if (event->enc_change.status == 0)
+    xTimerStop(pairing_timer, 0);
+    pairing_start_time = 0;    
+   
+    if (status == 0)
     {
-        xTimerStop(pairing_timer, 0);
-        pairing_start_time = 0;
-        
+        ESP_LOGI(TAG, "Encryption established!");
+        if (provisioning_is_active())
+        {
+            ESP_LOGI(TAG, "Secure provisioning established");
+        }
+        return 0;
     }
-    else
-    {   
-        xTimerStop(pairing_timer, 0);
-        pairing_start_time = 0;
+    ESP_LOGE(TAG, "Encryption failed, status=%d", status);
 
+    if (provisioning_is_active())
+    {
         int node_index = find_node_index(&current_peer_addr);
         if (!pairing_failed && node_index >= 0)
         {
@@ -472,6 +484,10 @@ static int gap_event_enc_change(struct ble_gap_event *event)
         }  
         current_conn_handle = BLE_HS_CONN_HANDLE_NONE;
         ble_state = BLE_STATE_SCANNING;
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Encryption failed, (Connected to mesh node)");
     }
     return 0;
 } 
