@@ -50,7 +50,6 @@ pub async fn start_ble_server(
     };
 
     let _agent_handle = session.register_agent(agent).await?;
-    session.set_default_agent().await?;
     log::info!("BLE: Auto-pairing agent active");
        
 
