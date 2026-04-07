@@ -8,7 +8,7 @@ use crate::ble::config::PROVISIONING_SERVICE_UUID;
 use crate::provisioning::manager::build_hmac_edge_payload;
 use crate::provisioning::models::HmacState;
 
-use bluer::agent::{Agent, Capability}; // <---- test
+use bluer::agent::Agent; // <---- test
 
 #[derive(Debug, Clone)]
 pub struct BleProvisioningData {
@@ -37,17 +37,16 @@ pub async fn start_ble_server(
     adapter.set_discoverable_timeout(0).await?;
     
     let agent = Agent {
-        capability: Capability::NoInputNoOutput,
+        request_default: true,
 
-        request_confirmation: Some(Box::new(|_req| {
+        authorize_service: Some(Box::new(|_req| {
             Box::pin(async move { Ok(()) })
         })),
 
-        request_authorization: Some(Box::new(|_req| {
-            Box::pin(async move { Ok(()) })
-        })),
-
-        ..Default::default()
+        request_pin_code: None,
+        display_pin_code: None,
+        request_passkey: None,
+        display_passkey: None,
     };
 
     let _agent_handle = session.register_agent(agent).await?;
