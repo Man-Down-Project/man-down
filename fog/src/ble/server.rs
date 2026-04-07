@@ -8,6 +8,8 @@ use crate::ble::config::PROVISIONING_SERVICE_UUID;
 use crate::provisioning::manager::build_hmac_edge_payload;
 use crate::provisioning::models::HmacState;
 
+use bluer::agent::{Agent, Capability}; // <---- test
+
 #[derive(Debug, Clone)]
 pub struct BleProvisioningData {
     pub hmac_key: String,
@@ -31,14 +33,19 @@ pub async fn start_ble_server(
     //fix för att automatiskt sätta på och ställa in bluetooth på zeron
     adapter.set_powered(true).await?;
     adapter.set_discoverable(true).await?;
-    adapter.set.pairable(true).await?;
+    adapter.set_pairable(true).await?;
     adapter.set_discoverable_timeout(0).await?;
-
-    let agent = bluer::agent::Agent {
-        capability: bluer::agent::Capability::NoInputNoOutput,
-        ..Default::default()
-    };
+    
+    let agent = Agent::new(Capability::NoInputNoOutput)
+        .request_confirmation (|_req|async move { 
+            Ok(()) 
+        })
+        .request_authorization(|_req| async move {
+            Ok(())
+        });  
+    
     let _agent_handle = session.register_agent(agent).await?;
+    session.set_default_agent().await?;
     log::info!("BLE: Auto-pairing agent active");
        
 
