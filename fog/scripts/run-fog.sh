@@ -3,6 +3,7 @@ set -e
 
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-echo "Starting Mosquitto..."
+cd "$BASE_DIR"
 
-mosquitto -c "$BASE_DIR/mosquitto-dev.conf"
+echo "Starting fog..."
+RUST_LOG=info cargo run

@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     env_logger::init();
 
     let config = AppConfig::from_env()?;
-    //let storage = Storage::new(&config.db_path, &config.db_key)?;
+    let storage = Storage::new(&config.db_path, &config.db_key)?;
 
     let hmac = if let Some(existing) = load_hmac_state() {
         if hmac_needs_rotation(&existing) {
@@ -95,15 +95,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     publish_initial_provisioning(&outgoing_tx, &provisioning_state).await;
 
-    //let processor = run_processor(rx, storage);
+    let processor = run_processor(rx, storage);
 
     tokio::select! {
         _= tokio::signal::ctrl_c() => {
            log::info!("Ctrl+C received, shutting down...");
         }
-        //_= processor => {
-        //    log::info!("Processor exited");
-        //}
+        _= processor => {
+            log::info!("Processor exited");
+        }
     }
 
     let _ = shutdown_tx.send(true);
