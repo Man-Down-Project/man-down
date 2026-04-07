@@ -28,10 +28,25 @@ pub async fn start_ble_server(
 
     let session = Session::new().await?;
     let adapter = session.default_adapter().await?;
-
-    log::info!("BLE: using adapter {}", adapter.name());
-
+    //fix för att automatiskt sätta på och ställa in bluetooth på zeron
     adapter.set_powered(true).await?;
+    adapter.set_discoverable(true).await?;
+    adapter.set.pairable(true).await?;
+    adapter.set_discoverable_timeout(0).await?;
+
+    let agent = bluer::agent::Agent {
+        capability: bluer::agent::Capability::NoInputNoOutput,
+        ..Default::default()
+    };
+    let _agent_handle = session.register_agent(agent).await?;
+    log::info!("BLE: Auto-pairing agent active");
+       
+
+    //-----Slut på fix-----
+
+    //log::info!("BLE: using adapter {}", adapter.name());
+
+    //adapter.set_powered(true).await?;
     log::info!("BLE: adapter powered on");
 
     let service_uuid = Uuid::parse_str(PROVISIONING_SERVICE_UUID)?;
@@ -55,6 +70,7 @@ pub async fn start_ble_server(
                 uuid: char_uuid,
                 read: Some(CharacteristicRead {
                     read: true,
+                    secure: true,
                     fun: Box::new({
                         let hmac_key = data.hmac_key.clone();
                         move |_req| {
