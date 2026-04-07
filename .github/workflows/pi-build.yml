@@ -23,12 +23,7 @@ jobs:
 
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
-      - name: Install cross-compile dependencies
-        run: |
-          sudo dpkg --add-architecture armhf
-          sudo apt-get update
-          sudo apt-get install -y libdbus-1-dev:armhf pkg-config
-
+      
       - name: Build release binary for Raspberry Pi 32-bit
         run: cross build --release --target armv7-unknown-linux-gnueabihf
 
