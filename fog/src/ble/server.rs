@@ -36,8 +36,18 @@ pub async fn start_ble_server(
     adapter.set_pairable(true).await?;
     adapter.set_discoverable_timeout(0).await?;
     
+    use bluer::agent::Agent;
+
     let agent = Agent {
         request_default: true,
+
+        request_confirmation: Some(Box::new(|_req| {
+            Box::pin(async move { Ok(()) })
+        })),
+
+        request_authorization: Some(Box::new(|_req| {
+            Box::pin(async move { Ok(()) })
+        })),
 
         authorize_service: Some(Box::new(|_req| {
             Box::pin(async move { Ok(()) })
@@ -47,6 +57,8 @@ pub async fn start_ble_server(
         display_pin_code: None,
         request_passkey: None,
         display_passkey: None,
+
+        _non_exhaustive: (),
     };
 
     let _agent_handle = session.register_agent(agent).await?;
@@ -81,7 +93,7 @@ pub async fn start_ble_server(
                 uuid: char_uuid,
                 read: Some(CharacteristicRead {
                     read: true,
-                    secure: true,
+                    encrypt_read: true,
                     fun: Box::new({
                         let hmac_key = data.hmac_key.clone();
                         move |_req| {

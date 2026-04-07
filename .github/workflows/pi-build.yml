@@ -24,8 +24,6 @@ jobs:
       - name: Install cross
         run: cargo install cross --git https://github.com/cross-rs/cross
       
-      - name: Build release binary for Raspberry Pi 32-bit
-        run: cross build --release --target armv7-unknown-linux-gnueabihf
       - name: Set up Docker layer caching
         uses: docker/setup-buildx-action@v3
 
@@ -36,10 +34,14 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
+            
+      - name: Build release binary for Raspberry Pi 32-bit
+        run: cross build --release --target armv7-unknown-linux-gnueabihf
+      
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: fog-armv7-unknown-linux-gnueabihf
-          path: fog/target/armv7-unknown-linux-gnueabihf/release/fog
+          path: target/armv7-unknown-linux-gnueabihf/release/fog
           
