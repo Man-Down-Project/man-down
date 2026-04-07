@@ -1,10 +1,12 @@
 mod app_config;
+mod ble;
 mod events;
 mod mqtt;
 mod provisioning;
 mod storage;
 
 use crate::app_config::AppConfig;
+use crate::ble::server::{BleProvisioningData, start_ble_server};
 use crate::events::{Envelope, Incident};
 use crate::mqtt::OutgoingMessage;
 use crate::mqtt::start_mqtt;
@@ -62,6 +64,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         },
     };
 
+    let ble_data = BleProvisioningData::from_hmac_state(&provisioning_state.hmac);
+
     log::info!("MQTT broker: {}:{}", config.mqtt.host, config.mqtt.port);
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
@@ -71,6 +75,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let scheduler_tx = outgoing_tx.clone();
     let scheduler_task = tokio::spawn(async move {
         run_hmac_rotation_scheduler(scheduler_tx).await;
+    });
+
+    let ble_task = tokio::spawn(async move {
+        if let Err(e) = start_ble_server(ble_data).await {
+            log::error!("BLE task exited with error: {}", e);
+        }
     });
 
     let mqtt_tx = tx.clone();
@@ -103,6 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = mqtt_task.await;
 
     scheduler_task.abort();
+    ble_task.abort();
 
     log::info!("Shutdown complete");
     Ok(())
