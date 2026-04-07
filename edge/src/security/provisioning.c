@@ -23,7 +23,7 @@ void provisioning_init(void)
 
     if (active)
     {
-        led_set(RGB_MAGENTA, LED_MODE_BLINK);
+        led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_MEDIUM);
     }
 }
 
@@ -43,7 +43,7 @@ void provisioning_on_connected(uint16_t conn_handle)
 {
     if (!active) return;
     ESP_LOGI(TAG, "Connected for provisioning");
-    led_set(RGB_MAGENTA, LED_MODE_SOLID);
+    led_set(RGB_MAGENTA, LED_MODE_SOLID, LED_PRIO_MEDIUM);
 }
 
 void provisioning_handle_rx(const uint8_t *data, size_t len)

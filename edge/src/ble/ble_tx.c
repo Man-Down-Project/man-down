@@ -26,6 +26,8 @@ bool notifications_ready = false;
 bool waiting_for_ack = false;
 QueueHandle_t ble_tx_queue;
 TimerHandle_t heartbeat_timer;
+TaskHandle_t ble_tx_task_handle = NULL;
+BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
 static const char *TAG = "[BLE_TX]";
 
@@ -91,9 +93,20 @@ void ble_tx_task(void *arg)
     ble_tx_msg_t msg;
 
     while(1) {
+
+        if (ulTaskNotifyTake(pdTRUE, 0))
+        {
+            battery_set(99);
+            edge_trigger_event(EVENT_HEARTBEAT, battery_get());
+
+            if (!provisioning_is_active())
+            {       
+                led_set(RGB_GREEN, LED_MODE_PULSE, LED_PRIO_LOW);  
+            }
+        }
         if (!tx_packet_pending)
         {
-            if (xQueueReceive(ble_tx_queue, &msg, portMAX_DELAY))
+            if (xQueueReceive(ble_tx_queue, &msg, pdMS_TO_TICKS(20)))
             {
                 tx_packet = msg.event;
                 tx_packet_pending = true;
@@ -161,14 +174,10 @@ void ble_tx_task(void *arg)
     }
 }
 
+
+
 void heartbeat_timer_cb(TimerHandle_t xTimer)
 {
-    battery_set(99);
-    edge_trigger_event(EVENT_HEARTBEAT, battery_get());
-
-    if (!provisioning_is_active())
-    {       
-        led_set(RGB_GREEN, LED_MODE_PULSE);  
-    }
+    xTaskNotifyGive(ble_tx_task_handle);
 }
 

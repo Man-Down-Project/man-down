@@ -20,6 +20,7 @@ extern volatile bool gatt_busy;
 extern bool tx_packet_pending;
 extern uint8_t sequence_counter;
 extern bool waiting_for_ack;
+extern TaskHandle_t ble_tx_task_handle;
 
 void ble_send_event(const edge_event_t *event);
 void ble_tx_task(void *arg);

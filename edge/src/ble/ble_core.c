@@ -127,7 +127,7 @@ void ble_init()
                 4096,
                 NULL,
                 7,
-                NULL);
+                &ble_tx_task_handle);
     
     heartbeat_timer = xTimerCreate("hb",
                                    pdMS_TO_TICKS(HEART_TIMER),
@@ -141,7 +141,7 @@ void ble_init()
                                  pdFALSE,
                                  NULL,
                                  pairing_timeout_cb);
-    
+
     // ========================================
     // Start NimBLE host task (need to be last)
     // ========================================

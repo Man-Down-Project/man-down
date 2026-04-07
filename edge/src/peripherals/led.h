@@ -22,9 +22,16 @@ typedef enum {
     LED_MODE_PULSE
 } led_mode_t;
 
+typedef enum {
+    LED_PRIO_LOW = 0,
+    LED_PRIO_MEDIUM,
+    LED_PRIO_HIGH
+} led_priority_t;
+
 void led_init(void);
-void led_set(rgb_color_t color, led_mode_t mode);
+void led_set(rgb_color_t color, led_mode_t mode, led_priority_t prio);
 void led_off(void);
+void led_release(led_priority_t prio);
 
 
 #endif

@@ -24,6 +24,7 @@ static rgb_color_t current_color;
 static rgb_color_t led_color = RGB_OFF;
 static led_mode_t led_mode = LED_MODE_OFF;
 static portMUX_TYPE led_mux = portMUX_INITIALIZER_UNLOCKED;
+static led_priority_t current_priority = LED_PRIO_LOW;
 
 
 static void channel_init(int gpio, ledc_channel_t ch)
@@ -146,15 +147,32 @@ void led_init(void)
                 NULL);
 }
 
-void led_set(rgb_color_t color, led_mode_t mode)
+void led_set(rgb_color_t color, led_mode_t mode, led_priority_t prio)
 {
     taskENTER_CRITICAL(&led_mux);
-    led_color = color;
-    led_mode  = mode;
+    if(prio >= current_priority)
+    {
+        led_color = color;
+        led_mode  = mode;
+        current_priority = prio;
+    }
+    taskEXIT_CRITICAL(&led_mux);
+}
+
+void led_release(led_priority_t prio)
+{
+    taskENTER_CRITICAL(&led_mux);
+
+    if (prio == current_priority)
+    {
+        current_priority = LED_PRIO_LOW;
+        led_mode = LED_MODE_OFF;
+        led_color = RGB_OFF;
+    }
     taskEXIT_CRITICAL(&led_mux);
 }
 
 void led_off(void) 
 {
-    led_set(RGB_OFF, LED_MODE_OFF);
+    led_set(RGB_OFF, LED_MODE_OFF, LED_PRIO_HIGH);
 }
