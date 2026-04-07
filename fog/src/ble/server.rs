@@ -59,7 +59,7 @@ pub async fn start_ble_server(
                         let hmac_key = data.hmac_key.clone();
                         move |_req| {
                             log::info!("BLE: edge requested HMAC key");
-                            let value = hmac_key.clone().into_bytes();
+                            let value = hex::decode(&hmac_key).unwrap();
                             Box::pin(async move { Ok(value) })
                         }
                     }),

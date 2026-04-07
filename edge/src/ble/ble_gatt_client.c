@@ -60,6 +60,10 @@ static int gatt_dsc_cb(uint16_t conn_handle,
                        uint16_t chr_val_handle,
                        const struct ble_gatt_dsc *dsc,
                        void *arg);
+static int provisioning_read_cb(uint16_t conn_handle,
+                                const struct ble_gatt_error *error,
+                                struct ble_gatt_attr *attr,
+                                void *arg);
 
 // Funcs
 void gatt_set_handles(uint16_t svc_start,
@@ -148,8 +152,16 @@ static int gatt_chr_cb(uint16_t conn_handle,
         
         if (provisioning_is_active() &&
             ble_uuid_cmp(&chr->uuid.u, &provisioning_char_uuid.u) == 0) {
-                provisioning_char_handle = chr->val_handle;
+                provisioning_char_handle = chr->val_handle; 
                 ESP_LOGI(TAG, "Provisioning characteristic found!");
+
+                //provisorisk lösning "Read" tills notify är fixat på fog
+                
+                // ble_gattc_read(conn_handle,
+                //                provisioning_char_handle,
+                //                provisioning_read_cb,
+                //                NULL);
+                // return 0;
             }
         if (ble_uuid_cmp(&chr->uuid.u, &event_rx_uuid.u) == 0) {
             event_char_handle = chr->val_handle;
@@ -181,6 +193,11 @@ static int gatt_chr_cb(uint16_t conn_handle,
                                         0xFFFF,
                                         gatt_dsc_cb,
                                         NULL);
+                ble_gattc_read(conn_handle,
+                               provisioning_char_handle,
+                               provisioning_read_cb,
+                               NULL);
+                ESP_LOGI(TAG, "Reading provisioning characteristic...");
             } else {
                 ESP_LOGE(TAG, "Provisioning characteristic not found!");
             }
@@ -276,6 +293,24 @@ static int subscribe_cb(uint16_t conn_handle,
         ESP_LOGE(TAG, "Failed to enable notify");
     }
     
+    return 0;
+}
+
+static int provisioning_read_cb(uint16_t conn_handle,
+                                const struct ble_gatt_error *error,
+                                struct ble_gatt_attr *attr,
+                                void *arg)
+{
+    if (error->status != 0) {
+        ESP_LOGE(TAG, "Provisioning read failed: %d", error->status);
+        return 0;
+    }
+    uint16_t len = OS_MBUF_PKTLEN(attr->om);
+    uint8_t buffer[16];
+
+    ble_hs_mbuf_to_flat(attr->om, buffer, sizeof(buffer), &len);
+    ESP_LOGI(TAG, "Provisioning data received via READ");
+    provisioning_handle_rx(buffer, len);
     return 0;
 }
 
