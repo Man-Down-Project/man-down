@@ -36,14 +36,20 @@ pub async fn start_ble_server(
     adapter.set_pairable(true).await?;
     adapter.set_discoverable_timeout(0).await?;
     
-    let agent = Agent::new(Capability::NoInputNoOutput)
-        .request_confirmation (|_req|async move { 
-            Ok(()) 
-        })
-        .request_authorization(|_req| async move {
-            Ok(())
-        });  
-    
+    let agent = Agent {
+        capability: Capability::NoInputNoOutput,
+
+        request_confirmation: Some(Box::new(|_req| {
+            Box::pin(async move { Ok(()) })
+        })),
+
+        request_authorization: Some(Box::new(|_req| {
+            Box::pin(async move { Ok(()) })
+        })),
+
+        ..Default::default()
+    };
+
     let _agent_handle = session.register_agent(agent).await?;
     session.set_default_agent().await?;
     log::info!("BLE: Auto-pairing agent active");
