@@ -12,8 +12,6 @@ use crate::ble::config::PROVISIONING_SERVICE_UUID;
 use crate::provisioning::manager::build_hmac_edge_payload;
 use crate::provisioning::models::HmacState;
 
-use bluer::agent::Agent; // <---- test
-
 #[derive(Debug, Clone)]
 pub struct BleProvisioningData {
     pub hmac_key: String,
@@ -34,28 +32,23 @@ pub async fn start_ble_server(
 
     let session = Session::new().await?;
     let adapter = session.default_adapter().await?;
+
     //fix för att automatiskt sätta på och ställa in bluetooth på zeron
     adapter.set_powered(true).await?;
     adapter.set_discoverable(true).await?;
     adapter.set_pairable(true).await?;
     adapter.set_discoverable_timeout(0).await?;
-    
+
     use bluer::agent::Agent;
 
     let agent = Agent {
         request_default: true,
 
-        request_confirmation: Some(Box::new(|_req| {
-            Box::pin(async move { Ok(()) })
-        })),
+        request_confirmation: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
 
-        request_authorization: Some(Box::new(|_req| {
-            Box::pin(async move { Ok(()) })
-        })),
+        request_authorization: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
 
-        authorize_service: Some(Box::new(|_req| {
-            Box::pin(async move { Ok(()) })
-        })),
+        authorize_service: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
 
         request_pin_code: None,
         display_pin_code: None,
@@ -67,7 +60,6 @@ pub async fn start_ble_server(
 
     let _agent_handle = session.register_agent(agent).await?;
     log::info!("BLE: Auto-pairing agent active");
-       
 
     //-----Slut på fix-----
 
@@ -110,6 +102,7 @@ pub async fn start_ble_server(
                 }),
                 notify: Some(CharacteristicNotify {
                     notify: true,
+                    indicate: true,
                     method: CharacteristicNotifyMethod::Fun(Box::new({
                         let hmac_key = data.hmac_key.clone();
                         move |mut notifier| {
@@ -120,15 +113,11 @@ pub async fn start_ble_server(
                                     notifier.confirming()
                                 );
 
-                                tokio::spawn(async move {
-                                    if let Err(err) = notifier.notify(value).await {
-                                        log::error!("BLE: notify failed: {}", err);
-                                    } else {
-                                        log::info!("BLE: HMAC sent via notify/indicate");
-                                    }
-                                });
-
-                                Ok(())
+                                if let Err(err) = notifier.notify(value).await {
+                                    log::error!("BLE: notify failed: {}", err);
+                                } else {
+                                    log::info!("BLE: HMAC sent via notify/indicate");
+                                }
                             }
                             .boxed()
                         }
