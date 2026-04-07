@@ -1,6 +1,10 @@
 use bluer::Session;
 use bluer::adv::{Advertisement, AdvertisementHandle};
-use bluer::gatt::local::{Application, Characteristic, CharacteristicRead, Service};
+use bluer::gatt::local::{
+    Application, Characteristic, CharacteristicNotify, CharacteristicNotifyMethod,
+    CharacteristicRead, Service,
+};
+use futures::FutureExt;
 use uuid::Uuid;
 
 use crate::ble::config::PROVISIONING_CHAR_UUID;
@@ -102,6 +106,33 @@ pub async fn start_ble_server(
                             Box::pin(async move { Ok(value) })
                         }
                     }),
+                    ..Default::default()
+                }),
+                notify: Some(CharacteristicNotify {
+                    notify: true,
+                    method: CharacteristicNotifyMethod::Fun(Box::new({
+                        let hmac_key = data.hmac_key.clone();
+                        move |mut notifier| {
+                            let value = hmac_key.clone().into_bytes();
+                            async move {
+                                log::info!(
+                                    "BLE: notify session started (confirming={:?})",
+                                    notifier.confirming()
+                                );
+
+                                tokio::spawn(async move {
+                                    if let Err(err) = notifier.notify(value).await {
+                                        log::error!("BLE: notify failed: {}", err);
+                                    } else {
+                                        log::info!("BLE: HMAC sent via notify/indicate");
+                                    }
+                                });
+
+                                Ok(())
+                            }
+                            .boxed()
+                        }
+                    })),
                     ..Default::default()
                 }),
                 ..Default::default()
