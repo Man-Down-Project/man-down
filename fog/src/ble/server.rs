@@ -1,4 +1,5 @@
 use bluer::Session;
+use bluer::adv::{Advertisement, AdvertisementHandle};
 use bluer::gatt::local::{Application, Characteristic, CharacteristicRead, Service};
 use uuid::Uuid;
 
@@ -35,6 +36,16 @@ pub async fn start_ble_server(
 
     let service_uuid = Uuid::parse_str(PROVISIONING_SERVICE_UUID)?;
     let char_uuid = Uuid::parse_str(PROVISIONING_CHAR_UUID)?;
+
+    let adv = Advertisement {
+        service_uuids: [service_uuid].into_iter().collect(),
+        discoverable: Some(true),
+        local_name: Some("fog-node".to_string()),
+        ..Default::default()
+    };
+
+    let _adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
+    log::info!("BLE: advertising started");
 
     let app = Application {
         services: vec![Service {
