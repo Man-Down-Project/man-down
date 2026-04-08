@@ -38,6 +38,7 @@ topic write mesh/node/#
 EOF
 
 rm -f "./passwordfile"
+# Note: Requires mosquitto-clients installed locally
 mosquitto_passwd -b -c "./passwordfile" fog_user dev
 mosquitto_passwd -b "./passwordfile" mesh_user dev
 
@@ -113,7 +114,7 @@ echo "⚙️ Running remote configuration..."
 run_ssh "
     cd $DEST && \
     
-    # 1. Reset Dev State (Now correctly running ON the Pi)
+    # 1. Reset Dev State
     echo 'Resetting dev state on Pi...' && \
     rm -f $DEST/data/fog.db && \
     rm -f $DEST/state/hmac.json && \
@@ -122,22 +123,32 @@ run_ssh "
     sudo sh $SCRIPTS/gen-certs.sh && \
     sudo sh $SCRIPTS/gen-mqtt-auth.sh && \
 
-    # 3. Setup Mosquitto
+    # 3. Setup Mosquitto (System Copy)
     sudo mkdir -p /etc/mosquitto/certs && \
-    sudo cp $DEST/certs/* /etc/mosquitto/certs/ && \
+    
+    # Check if certs exist before copying to avoid errors
+    if [ -d \"$DEST/certs\" ] && [ \"\$(ls -A $DEST/certs)\" ]; then
+        sudo cp $DEST/certs/* /etc/mosquitto/certs/
+    fi
+    
     sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo mv $DEST/passwordfile /etc/mosquitto/passwordfile && \
+    
+    # Set Ownership for everything in Mosquitto folder
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chmod 700 /etc/mosquitto/certs && \
-    sudo chmod 644 /etc/mosquitto/certs/*.crt && \
-    sudo chmod 600 /etc/mosquitto/certs/*.key && \
+    
+    # Use find to prevent 'No such file' errors with wildcards
+    sudo find /etc/mosquitto/certs/ -name '*.crt' -exec chmod 644 {} + && \
+    sudo find /etc/mosquitto/certs/ -name '*.key' -exec chmod 600 {} + && \
     sudo chmod 600 /etc/mosquitto/passwordfile && \
+    
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf && \
 
-    # 4. Setup Rust App Certs
+    # 4. Setup Rust App Certs (Local Copy)
     sudo chown -R $PI_USER:$PI_USER $DEST/certs && \
-    chmod 644 $DEST/certs/*.crt && \
-    chmod 600 $DEST/certs/*.key && \
+    find $DEST/certs/ -name '*.crt' -exec chmod 644 {} + && \
+    find $DEST/certs/ -name '*.key' -exec chmod 600 {} + && \
     
     # 5. Service Management
     sudo mv $DEST/man_down.service /etc/systemd/system/ && \
