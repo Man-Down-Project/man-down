@@ -60,8 +60,15 @@ RestartSec=5
 WantedBy=multi-user.target 
 EOF
 
-# 3. Generate Mosquitto Config
+# 3. Generate Mosquitto Config (WITH PERSISTENCE)
 cat > mosquitto-dev.conf <<EOF
+# --- Persistence ---
+persistence true
+persistence_location /var/lib/mosquitto/
+persistence_file mosquitto.db
+autosave_interval 300
+
+# --- Listeners ---
 listener 8883
 protocol mqtt
 cafile /etc/mosquitto/certs/ca.crt
@@ -114,6 +121,9 @@ echo "⚙️ Running remote configuration..."
 run_ssh "
     cd $DEST && \
     
+    # 0. Set permissions for binary
+    chmod +x $DEST/fog && \
+
     # 1. Reset Dev State
     echo 'Resetting dev state on Pi...' && \
     rm -f $DEST/data/fog.db && \
@@ -121,12 +131,13 @@ run_ssh "
 
     # 2. Run your setup scripts
     sudo sh $SCRIPTS/gen-certs.sh && \
-    sudo sh $SCRIPTS/gen-mqtt-auth.sh && \
+    # sudo sh $SCRIPTS/gen-mqtt-auth.sh && \ # Commented out as you handle auth above
 
     # 3. Setup Mosquitto (System Copy)
     sudo mkdir -p /etc/mosquitto/certs && \
+    sudo mkdir -p /var/lib/mosquitto && \
     
-    # Check if certs exist before copying to avoid errors
+    # Check if certs exist before copying
     if [ -d \"$DEST/certs\" ] && [ \"\$(ls -A $DEST/certs)\" ]; then
         sudo cp $DEST/certs/* /etc/mosquitto/certs/
     fi
@@ -134,11 +145,11 @@ run_ssh "
     sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo mv $DEST/passwordfile /etc/mosquitto/passwordfile && \
     
-    # Set Ownership for everything in Mosquitto folder
+    # Set Ownership for everything in Mosquitto folder + Persistence folder
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
+    sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
     sudo chmod 700 /etc/mosquitto/certs && \
     
-    # Use find to prevent 'No such file' errors with wildcards
     sudo find /etc/mosquitto/certs/ -name '*.crt' -exec chmod 644 {} + && \
     sudo find /etc/mosquitto/certs/ -name '*.key' -exec chmod 600 {} + && \
     sudo chmod 600 /etc/mosquitto/passwordfile && \
