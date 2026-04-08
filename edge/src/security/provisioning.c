@@ -7,6 +7,7 @@
 #include "ble/ble_gap.h"
 #include "ble/ble_gatt_client.h"
 #include "peripherals/led.h"
+#include "peripherals/onboard_led.h"
 #include "esp_system.h"
 
 #define HMAC_KEY_SIZE 16
@@ -23,7 +24,8 @@ void provisioning_init(void)
 
     if (active)
     {
-        led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_MEDIUM);
+        led_set(RGB_BLUE, LED_MODE_BLINK, LED_PRIO_MEDIUM);
+        onboard_led_set(RGB_BLUE, LED_MODE_BLINK, LED_PRIO_MEDIUM);
     }
 }
 
@@ -43,7 +45,8 @@ void provisioning_on_connected(uint16_t conn_handle)
 {
     if (!active) return;
     ESP_LOGI(TAG, "Connected for provisioning");
-    led_set(RGB_MAGENTA, LED_MODE_SOLID, LED_PRIO_MEDIUM);
+    led_set(RGB_GREEN, LED_MODE_SOLID, LED_PRIO_MEDIUM);
+    onboard_led_set(RGB_GREEN, LED_MODE_SOLID, LED_PRIO_MEDIUM);
 }
 
 void provisioning_handle_rx(const uint8_t *data, size_t len)
