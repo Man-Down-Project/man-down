@@ -13,6 +13,7 @@
 #include "peripherals/button.h"
 #include "peripherals/buzzer.h"
 #include "peripherals/led.h"
+#include "peripherals/onboard_led.h"
 #include "peripherals/sensors/accelerometer.h"
 #include "system/system_events.h"
 #include "system/event_task.h"
@@ -31,6 +32,7 @@ void app_main(void)
     accelerometer_init();
     button_init();
     buzzer_init();
-    led_init(); 
+    led_init();
+    onboard_led_init(); 
 }
 

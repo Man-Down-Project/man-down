@@ -260,8 +260,7 @@ static void bma400_task(void *arg)
 void accelerometer_init(void)
 {
     i2c_master_init();
-    bma400_gpio_init();
-    bma400_sensor_init();
+    
     
     for (int i = 0; i < 10; i++)
     {
@@ -275,6 +274,8 @@ void accelerometer_init(void)
                 NULL,
                 5,
                 &bma400_task_handle);
+    bma400_gpio_init();
+    bma400_sensor_init();
 }
 
 static void bma400_dump_interrupts(void)

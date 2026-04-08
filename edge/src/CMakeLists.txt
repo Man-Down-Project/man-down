@@ -8,6 +8,7 @@ idf_component_register(SRCS ${app_sources}
                        REQUIRES
                             bt
                             nvs_flash
+                            led_strip
                             
                             
 )

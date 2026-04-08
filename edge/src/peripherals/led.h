@@ -11,7 +11,8 @@ typedef enum {
     RGB_YELLOW,
     RGB_MAGENTA,
     RGB_WHITE,
-    RGB_CYAN
+    RGB_CYAN,
+    RGB_DARK_PURPLE
 } rgb_color_t;
 
 typedef enum {

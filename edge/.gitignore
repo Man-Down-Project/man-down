@@ -4,3 +4,6 @@
 .vscode/launch.json
 .vscode/ipch
 sdkconfig.esp32-h2-devkitm-1.old
+managed_components
+dependencies.lock
+

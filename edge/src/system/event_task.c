@@ -9,6 +9,7 @@
 #include "system_events.h"
 #include "peripherals/buzzer.h"
 #include "peripherals/led.h"
+#include "peripherals/onboard_led.h"
 #include "config/edge_config.h"
 #include "event/edge_event.h"
 
@@ -31,12 +32,14 @@ static void handle_event(system_event_t *ev)
         case EVENT_BUTTON_SHORT:
             
             led_set(RGB_RED, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_RED, LED_MODE_BLINK, LED_PRIO_HIGH);
             buzzer_play(BUZZER_FALL);
             edge_trigger_event(EVENT_FALLARM, 29);
             break;
         
         case EVENT_BUTTON_LONG:
             led_set(RGB_BLUE, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_DARK_PURPLE, LED_MODE_SOLID, LED_PRIO_HIGH);
             buzzer_play(BUZZER_GAS);
             edge_trigger_event(EVENT_GASLARM, 90);
             break;
@@ -44,26 +47,30 @@ static void handle_event(system_event_t *ev)
         case EVENT_BUTTON_RESET:
             
             buzzer_stop();
-            led_off();
+            led_off();onboard_led_off();
             led_set(RGB_CYAN, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_CYAN, LED_MODE_BLINK, LED_PRIO_HIGH);
             vTaskDelay(pdMS_TO_TICKS(500));            
-            led_off();
+            led_off();onboard_led_off();
             break;
         
         case EVENT_BUTTON_DOUBLE:
 
             led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_MEDIUM);
+            onboard_led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_MEDIUM);
             break;
         
         case EVENT_FALL_ALARM:
 
             led_set(RGB_RED, LED_MODE_SOLID, LED_PRIO_HIGH);
+            onboard_led_set(RGB_RED, LED_MODE_SOLID, LED_PRIO_HIGH);
             buzzer_play(BUZZER_FALL);
             edge_trigger_event(EVENT_FALLARM, 75);
             break;
             
         case EVENT_BUTTON_POWER:
             led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_HIGH);
             vTaskDelay(pdMS_TO_TICKS(500));
             nvs_flash_erase();
             esp_restart();

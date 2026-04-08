@@ -11,6 +11,7 @@
 #include "event/edge_event.h"
 #include "peripherals/battery.h"
 #include "peripherals/led.h"
+#include "peripherals/onboard_led.h"
 #include "security/provisioning.h"
 
 static edge_event_t tx_packet;
@@ -101,7 +102,8 @@ void ble_tx_task(void *arg)
 
             if (!provisioning_is_active())
             {       
-                led_set(RGB_GREEN, LED_MODE_PULSE, LED_PRIO_LOW);  
+                led_set(RGB_GREEN, LED_MODE_PULSE, LED_PRIO_LOW);
+                onboard_led_set(RGB_GREEN, LED_MODE_PULSE, LED_PRIO_LOW);  
             }
         }
         if (!tx_packet_pending)
