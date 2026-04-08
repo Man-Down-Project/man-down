@@ -3,6 +3,7 @@ mod ble;
 mod events;
 mod mqtt;
 mod provisioning;
+mod rfid;
 mod storage;
 
 use crate::app_config::AppConfig;
@@ -14,10 +15,12 @@ use crate::provisioning::manager::{build_initial_provisioning_messages, generate
 use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
 use crate::provisioning::scheduler::run_hmac_rotation_scheduler;
 use crate::provisioning::state::{hmac_needs_rotation, load_hmac_state, save_hmac_state};
+use crate::rfid::service::run_simulated_rfid;
 use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
-use tokio::sync::{mpsc, watch};
+use std::sync::Arc;
+use tokio::sync::{Mutex, mpsc, watch};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -64,23 +67,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         },
     };
 
-    let ble_data = BleProvisioningData::from_hmac_state(&provisioning_state.hmac);
-
     log::info!("MQTT broker: {}:{}", config.mqtt.host, config.mqtt.port);
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
+    let ble_running = Arc::new(Mutex::new(false));
+
+    let rfid_tx = tx.clone();
+    let rfid_task = tokio::spawn(async move {
+        run_simulated_rfid(rfid_tx).await;
+    });
+
     let scheduler_tx = outgoing_tx.clone();
     let scheduler_task = tokio::spawn(async move {
         run_hmac_rotation_scheduler(scheduler_tx).await;
-    });
-
-    let ble_task = tokio::spawn(async move {
-        if let Err(e) = start_ble_server(ble_data).await {
-            log::error!("BLE task exited with error: {}", e);
-        }
     });
 
     let mqtt_tx = tx.clone();
@@ -95,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     publish_initial_provisioning(&outgoing_tx, &provisioning_state).await;
 
-    let processor = run_processor(rx, storage);
+    let processor = run_processor(rx, storage, ble_running.clone());
 
     tokio::select! {
         _= tokio::signal::ctrl_c() => {
@@ -113,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = mqtt_task.await;
 
     scheduler_task.abort();
-    ble_task.abort();
+    rfid_task.abort();
 
     log::info!("Shutdown complete");
     Ok(())
@@ -132,7 +134,11 @@ async fn publish_initial_provisioning(
     }
 }
 
-async fn run_processor(mut rx: mpsc::Receiver<Envelope>, storage: Storage) {
+async fn run_processor(
+    mut rx: mpsc::Receiver<Envelope>,
+    storage: Storage,
+    ble_running: Arc<Mutex<bool>>,
+) {
     while let Some(env) = rx.recv().await {
         if let Err(e) = env.validate_basic() {
             log::warn!("Dropped invalid envelope: {}", e);
@@ -143,13 +149,13 @@ async fn run_processor(mut rx: mpsc::Receiver<Envelope>, storage: Storage) {
             log::error!("Failed to store event: {}", e);
         }
 
-        process_envelope(env).await;
+        process_envelope(env, ble_running.clone()).await;
     }
 
     log::info!("Processor: channel closed, exiting");
 }
 
-async fn process_envelope(env: Envelope) {
+async fn process_envelope(env: Envelope, ble_running: Arc<Mutex<bool>>) {
     log::info!(
         "Processing device_id={} seq={} incident={:?}",
         env.device_id,
@@ -169,6 +175,52 @@ async fn process_envelope(env: Envelope) {
         }
         Incident::Login { worker_id } => {
             log::info!("Login worker_id={}", worker_id);
+
+            let mut running = ble_running.lock().await;
+            if *running {
+                log::info!("BLE: provisioning already running, skipping new start");
+                return;
+            }
+
+            *running = true;
+            drop(running);
+
+            let hmac_state = match crate::provisioning::state::load_hmac_state() {
+                Some(h) => h,
+                None => {
+                    log::error!("BLE: no HMAC state found on disk");
+                    let mut running = ble_running.lock().await;
+                    *running = false;
+                    return;
+                }
+            };
+
+            let ble_data = BleProvisioningData::from_hmac_state(&hmac_state);
+            let ble_running_for_server = ble_running.clone();
+            let ble_running_for_timer = ble_running.clone();
+
+            let (tx, rx) = tokio::sync::oneshot::channel();
+
+            tokio::spawn(async move {
+                log::info!("BLE: starting provisioning (60s window)");
+
+                if let Err(e) = start_ble_server(ble_data, rx).await {
+                    log::error!("BLE error: {}", e);
+                }
+
+                let mut running = ble_running_for_server.lock().await;
+                *running = false;
+                log::info!("BLE: provisioning marked as stopped");
+            });
+
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                let _ = tx.send(());
+                log::info!("BLE: provisioning window closed");
+
+                let mut running = ble_running_for_timer.lock().await;
+                *running = false;
+            });
         }
         Incident::Logout { worker_id } => {
             log::info!("Logout worker_id={}", worker_id);

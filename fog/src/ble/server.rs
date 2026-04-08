@@ -1,5 +1,6 @@
 use bluer::Session;
 use bluer::adv::{Advertisement, AdvertisementHandle};
+use bluer::agent::Agent;
 use bluer::gatt::local::{
     Application, Characteristic, CharacteristicNotify, CharacteristicNotifyMethod,
     CharacteristicRead, Service,
@@ -27,27 +28,22 @@ impl BleProvisioningData {
 
 pub async fn start_ble_server(
     data: BleProvisioningData,
+    stop: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("BLE: starting provisioning server");
 
     let session = Session::new().await?;
     let adapter = session.default_adapter().await?;
 
-    //fix för att automatiskt sätta på och ställa in bluetooth på zeron
     adapter.set_powered(true).await?;
     adapter.set_discoverable(true).await?;
     adapter.set_pairable(true).await?;
     adapter.set_discoverable_timeout(0).await?;
 
-    use bluer::agent::Agent;
-
     let agent = Agent {
         request_default: true,
-
         request_confirmation: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
-
         request_authorization: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
-
         authorize_service: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
 
         request_pin_code: None,
@@ -61,11 +57,6 @@ pub async fn start_ble_server(
     let _agent_handle = session.register_agent(agent).await?;
     log::info!("BLE: Auto-pairing agent active");
 
-    //-----Slut på fix-----
-
-    //log::info!("BLE: using adapter {}", adapter.name());
-
-    //adapter.set_powered(true).await?;
     log::info!("BLE: adapter powered on");
 
     let service_uuid = Uuid::parse_str(PROVISIONING_SERVICE_UUID)?;
@@ -94,7 +85,15 @@ pub async fn start_ble_server(
                         let hmac_key = data.hmac_key.clone();
                         move |_req| {
                             log::info!("BLE: edge requested HMAC key");
-                            let value = hex::decode(&hmac_key).unwrap();
+                            let value = match hex::decode(&hmac_key) {
+                                Ok(v) => v,
+                                Err(err) => {
+                                    log::error!("BLE: failed to decode HMAC payload: {}", err);
+                                    return Box::pin(async move {
+                                        Err(bluer::gatt::local::ReqError::Failed)
+                                    });
+                                }
+                            };
                             Box::pin(async move { Ok(value) })
                         }
                     }),
@@ -106,7 +105,16 @@ pub async fn start_ble_server(
                     method: CharacteristicNotifyMethod::Fun(Box::new({
                         let hmac_key = data.hmac_key.clone();
                         move |mut notifier| {
-                            let value = hmac_key.clone().into_bytes();
+                            let value = match hex::decode(&hmac_key) {
+                                Ok(v) => v,
+                                Err(err) => {
+                                    log::error!(
+                                        "BLE: failed to decode HMAC payload for notify: {}",
+                                        err
+                                    );
+                                    return async move {}.boxed();
+                                }
+                            };
                             async move {
                                 log::info!(
                                     "BLE: notify session started (confirming={:?})",
@@ -134,10 +142,11 @@ pub async fn start_ble_server(
     let _app_handle = adapter.serve_gatt_application(app).await?;
 
     log::info!("BLE: provisioning service advertised");
-    log::info!("BLE: would expose HMAC key to edge: {}", data.hmac_key);
+    log::info!("BLE: provisioning service ready; HMAC payload prepared");
 
-    // Prevent function from returning so BLE GATT service stays active
-    futures::future::pending::<()>().await;
+    let _ = stop.await;
+    log::info!("BLE: stopping provisioning server");
+
     #[allow(unreachable_code)]
     Ok(())
 }
