@@ -86,7 +86,7 @@ void mqtt_handle_connection() {
     char client_id[32];
     snprintf(client_id, sizeof(client_id), "node_%d", NODE_ID);
 
-    if (mqttClient.connect(client_id, "", "")) {
+    if (mqttClient.connect(client_id, "mesh_user", "dev")) {
         Serial.println("MQTT connected");
 
         const char* provision_topic = "mesh/provisioning/#";

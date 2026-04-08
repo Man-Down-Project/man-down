@@ -19,3 +19,8 @@ typedef struct __attribute__((packed)) {
     uint8_t seq;
     uint16_t timestamp;
 }edge_event_out;
+
+struct runtime_compare {
+    uint8_t device_id[MAX_APPROVED_EDGE];
+    uint8_t last_seq[MAX_APPROVED_EDGE];
+};

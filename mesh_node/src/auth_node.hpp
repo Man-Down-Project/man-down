@@ -45,3 +45,4 @@ bool hexStringToByte(const char* str, uint8_t* out, size_t outLen);
 
 extern AuthNode authNode;
 extern eeprom_global_auth _eeprom;
+extern runtime_compare _seq_cache;

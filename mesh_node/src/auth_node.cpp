@@ -4,15 +4,17 @@
 #include <stddef.h>
 #include "auth_node.hpp"
 
-
 AuthNode authNode;
+runtime_compare _seq_cache;
 
 AuthNode::AuthNode() {
 
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
         _ram_auth.device_whitelist[i] = EMPTY_ID;
-        _ram_auth.last_seq[i] = 0xFF;
     }
+    
+    memset(_seq_cache.device_id, EMPTY_ID, MAX_APPROVED_EDGE);
+    memset(_seq_cache.last_seq, 0xFF, MAX_APPROVED_EDGE);
 
     memset(_ram_auth.auth.shared_key, 0, KEY_LEN);
     _ram_auth.auth.key_timestamp = 0;
@@ -96,17 +98,11 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
     if(idx == -1)
         return false;
 
-    uint8_t last =_ram_auth.last_seq[idx];
-
-    if(last != 0xFF && seq == last)
-        return false;
-    
-
     SHA256 sha;
     uint8_t full_hash[32];
     uint8_t computed_tag[AUTH_TAG_LEN];
 
-    //sha.resetHMAC(_ram_auth.auth.shared_key, KEY_LEN);
+    sha.resetHMAC(_ram_auth.auth.shared_key, KEY_LEN);
     sha.update((uint8_t*)pkt, offsetof(edge_event_t,  auth_tag));
     sha.finalizeHMAC(_ram_auth.auth.shared_key, KEY_LEN, full_hash, 32);
 
@@ -119,7 +115,38 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 
         return false;
     }
-    _ram_auth.last_seq[idx] = seq;
+
+    uint8_t last = 0xFF;
+
+    for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+        if(_seq_cache.device_id[i] == device_id){
+            last = _seq_cache.last_seq[i];
+            break;
+        }
+    }
+
+    if(last != 0xFF && seq == last)
+        return false;
+
+    bool updated = false;
+    
+    for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+        if(_seq_cache.device_id[i] == device_id){
+            _seq_cache.last_seq[i] = seq;
+            updated = true;
+            break;
+        }
+    }
+
+    if(!updated){
+        for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+            if(_seq_cache.device_id[i] == EMPTY_ID){
+                _seq_cache.device_id[i] = device_id;
+                _seq_cache.last_seq[i] = seq;
+                break;
+            }
+        }
+    }
 
     return true;
 }

@@ -4,7 +4,7 @@
 #include "config.hpp"
 
 #define EEPROM_MAGIC 0xDEADBEEF
-#define EEPROM_VERSION 1
+#define EEPROM_VERSION 2
 #define EMPTY_ID 0xFF
 
 
@@ -18,7 +18,6 @@ struct __attribute__ ((packed)) eeprom_global_auth{
     uint8_t version;
 
     uint8_t device_whitelist[MAX_APPROVED_EDGE];
-    uint8_t last_seq[MAX_APPROVED_EDGE];
     global_auth auth;
 };
 
