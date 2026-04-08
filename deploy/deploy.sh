@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="device"
-PI_IP="192.168.0.29"
-PI_PASS="blablabla" 
+PI_USER="device"            # <--change to device name
+PI_IP="192.168.X.X"          # <--add ip adress to device
+PI_PASS="password"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
-DB_ENCRYPTION_KEY="key"
+DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
 
 # Helper function to run commands with password
 run_ssh() {
