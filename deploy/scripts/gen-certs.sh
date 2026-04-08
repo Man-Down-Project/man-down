@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="beebee"
+PI_USER="beebee" # blablalbla
 PI_IP="192.168.0.29"
 PI_PASS="blablabla" 
 DEST="/home/$PI_USER/man_down"
