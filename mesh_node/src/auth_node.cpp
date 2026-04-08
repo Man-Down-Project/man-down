@@ -108,6 +108,23 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 
     memcpy(computed_tag, full_hash, AUTH_TAG_LEN);
 
+    Serial.println("---- AUTH DEBUG ----");
+    Serial.print("Received tag: ");
+    for (int i = 0; i < AUTH_TAG_LEN; i++) {
+        char buf[3]; // Buffer for 2 hex digits + null terminator
+        sprintf(buf, "%02X", pkt->auth_tag[i]);
+        Serial.print(buf);
+    }
+    Serial.println();
+
+    Serial.print("Computed tag: ");
+    for (int i = 0; i < AUTH_TAG_LEN; i++) {
+        char buf[3];
+        sprintf(buf, "%02X", computed_tag[i]);
+        Serial.print(buf);
+    }
+    Serial.println();
+    Serial.println("--------------------");
     // compare computed HMAC with received auth_tag
     if (!constTimeComp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN)) {
 
