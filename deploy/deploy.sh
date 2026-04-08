@@ -1,19 +1,48 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="beebee" # 👈 Add your Raspberry Pi Zero 2W username here
-PI_IP="192.168.0.29" # 👈 Add your Raspberry Pi Zero 2W ip here
-PI_PASS="blablabla"  # 👈 Add your password here
+PI_USER="beebee"
+PI_IP="192.168.0.29"
+PI_PASS="blablabla"
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
 DB_ENCRYPTION_KEY="key"
 
+# Helper function to run commands with password
+run_ssh() {
+    sshpass -p "$PI_PASS" ssh -o StrictHostKeyChecking=no "$PI_USER@$PI_IP" "$1"
+}
+
+run_rsync() {
+    sshpass -p "$PI_PASS" rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$1" "$2"
+}
+
 echo "🚀 Starting Deployment..."
 
 echo "📝 Generating local config files..."
 
-# Generate Systemd Service File
+# 1. ACL and Password Generation
+cat > aclfile <<EOF
+# ===== FOG =====
+user fog_user
+topic read mesh/node/#
+topic write mesh/provisioning/#
+topic write edge/provisioning/#
+
+# ===== MESH =====
+user mesh_user
+topic read mesh/provisioning/#
+topic read edge/provisioning/#
+topic write mesh/node/#
+EOF
+
+rm -f "./passwordfile"
+# Note: Requires mosquitto-clients installed locally to run mosquitto_passwd
+mosquitto_passwd -b -c "./passwordfile" fog_user dev
+mosquitto_passwd -b "./passwordfile" mesh_user dev
+
+# 2. Systemd Service File
 cat > man_down.service <<EOF
 [Unit]
 Description=Man Down Application
@@ -31,7 +60,7 @@ RestartSec=5
 WantedBy=multi-user.target 
 EOF
 
-# Generate Mosquitto Config
+# 3. Mosquitto Config (Added password and acl paths)
 cat > mosquitto-dev.conf <<EOF
 listener 8883
 protocol mqtt
@@ -50,38 +79,27 @@ keyfile /etc/mosquitto/certs/fog-server.key
 require_certificate true
 use_identity_as_username true
 allow_anonymous true 
+
+# Authentication
+password_file /etc/mosquitto/passwordfile
+acl_file /etc/mosquitto/aclfile
 EOF
 
-# Generate .env file
+# 4. .env file
 cat > .env <<EOF
 MQTT_HOST=127.0.0.1
 MQTT_PORT=8884
 MQTT_CLIENT_ID=fog-node-dev
 MQTT_TOPIC=mesh/node/#
-
 MQTT_USE_TLS=true
-
 MQTT_CA_PATH=$DEST/certs/fog-ca.crt
 MQTT_CERT_PATH=$DEST/certs/rust-fog.crt
 MQTT_KEY_PATH=$DEST/certs/rust-fog.key
-
 MQTT_KEEP_ALIVE_SECS=60
 MQTT_RECONNECT_DELAY_SECS=3
-
 DB_KEY=$DB_ENCRYPTION_KEY
 DB_PATH=$DEST/data/fog.db
 EOF
-
-# Helper function to run commands with password
-run_ssh() {
-    sshpass -p "$PI_PASS" ssh -o StrictHostKeyChecking=no "$PI_USER@$PI_IP" "$1"
-}
-
-run_rsync() {
-    sshpass -p "$PI_PASS" rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$1" "$2"
-}
-
-# ... [Generate files] ...
 
 echo "📦 Transferring files..."
 run_ssh "mkdir -p $DEST/data $DEST/certs $SCRIPTS"
@@ -90,6 +108,8 @@ run_rsync "$BINARY_PATH" "$PI_USER@$PI_IP:$DEST/"
 run_rsync ".env" "$PI_USER@$PI_IP:$DEST/"
 run_rsync "./man_down.service" "$PI_USER@$PI_IP:$DEST/"
 run_rsync "./mosquitto-dev.conf" "$PI_USER@$PI_IP:$DEST/"
+run_rsync "./aclfile" "$PI_USER@$PI_IP:$DEST/"
+run_rsync "./passwordfile" "$PI_USER@$PI_IP:$DEST/"
 
 echo "⚙️ Running remote configuration..."
 run_ssh "
@@ -98,13 +118,21 @@ run_ssh "
     sudo sh $SCRIPTS/gen-mqtt-auth.sh && \
     sudo sh $SCRIPTS/reset-dev-state.sh && \
 
-	# B. Setup Mosquitto (System Copy)
+    # B. Setup Mosquitto (System Copy)
     sudo mkdir -p /etc/mosquitto/certs && \
     sudo cp $DEST/certs/* /etc/mosquitto/certs/ && \
-    sudo chown -R mosquitto:mosquitto /etc/mosquitto/certs && \
+    
+    # Move Auth Files
+    sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
+    sudo mv $DEST/passwordfile /etc/mosquitto/passwordfile && \
+    
+    # Set Ownership for everything in Mosquitto
+    sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chmod 700 /etc/mosquitto/certs && \
     sudo chmod 644 /etc/mosquitto/certs/*.crt && \
     sudo chmod 600 /etc/mosquitto/certs/*.key && \
+    sudo chmod 600 /etc/mosquitto/passwordfile && \
+    
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf && \
 
     # C. Setup Rust App (Local Copy)
@@ -119,9 +147,7 @@ run_ssh "
     sudo systemctl enable man_down && \
     sudo systemctl restart man_down && \
 
-    # E. Set Capabilities for Bluetooth (Must be after binary transfer)
+    # E. Set Capabilities
     sudo setcap 'cap_net_raw,cap_net_admin+eip' $DEST/fog
 "
 echo "✅ DONE! Man Down is deployed and running."
-    
-   
