@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="device name"        # <--change to device name
+PI_USER="beebee"        # <--change to device name
 PI_IP="192.168.X.X"          # <--add ip adress to device
-PI_PASS="Password"           # <--change password to the device 
+PI_PASS="password"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
@@ -224,8 +224,7 @@ cat << "EOF"
                       ▓▓▓▓▒▒▒▒░░░░▓▓░░▓▓▓▓▒▒▒▒░░░░▓▓                  
                       ▓▓▒▒▒▒▒▒▒▒░░▓▓░░▓▓▒▒▒▒▒▒▒▒░░▓▓                  
                       ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓                  
-                                                                      
-                                                                      
+                                                                                                                                      
     ▓▓▓▓▓▓  ▓▓    ▓▓    ▓▓▓▓▓▓    ▓▓▓▓▒▒    ▓▓▓▓      ▓▓▓▓▓▓    ▓▓▓▓▓▓
   ░░▓▓        ▓▓    ▓▓  ▓▓        ▓▓        ▓▓    ▓▓  ▓▓        ▓▓      
     ░░▓▓▓▓    ▓▓    ▓▓  ▓▓        ▓▓        ▓▓▓▓▓▓▓▓    ▓▓▓▓      ▓▓▓▓  
