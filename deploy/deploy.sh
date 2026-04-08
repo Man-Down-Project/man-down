@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="device"             # <--change to device name
-PI_IP="192.168.X.X"          # <--add ip adress to device
-PI_PASS="password"           # <--change password to the device 
+PI_USER="beebee"             # <--change to device name
+PI_IP="192.168.0.29"          # <--add ip adress to device
+PI_PASS="Bennyhana123"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
@@ -75,7 +75,7 @@ certfile /etc/mosquitto/certs/server.crt
 keyfile /etc/mosquitto/certs/server.key
 require_certificate false
 use_identity_as_username false
-allow_anonymous true
+allow_anonymous false
 
 listener 8884
 protocol mqtt
@@ -83,8 +83,8 @@ cafile /etc/mosquitto/certs/fog-ca.crt
 certfile /etc/mosquitto/certs/fog-server.crt
 keyfile /etc/mosquitto/certs/fog-server.key
 require_certificate true
-use_identity_as_username true
-allow_anonymous true 
+use_identity_as_username false
+allow_anonymous false 
 
 password_file /etc/mosquitto/passwordfile
 acl_file /etc/mosquitto/aclfile
@@ -92,11 +92,16 @@ EOF
 
 # 4. Generate .env
 cat > .env <<EOF
-MQTT_HOST=127.0.0.1
+MQTT_HOST=$PI_IP
 MQTT_PORT=8884
 MQTT_CLIENT_ID=fog-node-dev
 MQTT_TOPIC=mesh/node/#
+
 MQTT_USE_TLS=true
+
+MQTT_USERNAME=fog_user
+MQTT_PASSWORD=dev
+
 MQTT_CA_PATH=$DEST/certs/fog-ca.crt
 MQTT_CERT_PATH=$DEST/certs/rust-fog.crt
 MQTT_KEY_PATH=$DEST/certs/rust-fog.key
@@ -141,8 +146,8 @@ run_ssh "
         sudo cp $DEST/certs/* /etc/mosquitto/certs/
     fi
     
-    sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
-    sudo mv $DEST/passwordfile /etc/mosquitto/passwordfile && \
+    sudo cp $DEST/aclfile /etc/mosquitto/aclfile && \
+    sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile && \
     
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
