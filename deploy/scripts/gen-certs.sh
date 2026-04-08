@@ -7,97 +7,74 @@ echo "Detected broker IP: $IP"
 mkdir -p certs
 cd certs
 
-echo "Generating CA..."
-openssl req -x509 -new -nodes -days 365 \
-  -subj "/CN=Fog-CA" \
+DAYS=365
+
+# ==========================================
+# 1. LEGACY CERTS (For Arduino/C++ Node)
+# ==========================================
+echo "Generating Legacy CA and Server Certs..."
+# CA for Arduino
+openssl req -x509 -new -nodes -days $DAYS \
+  -subj "/CN=Legacy-CA" \
   -keyout ca.key -out ca.crt
 
-echo "Generating server certificate..."
+# Server cert for Arduino (Listener 8883)
 openssl req -newkey rsa:2048 -nodes \
   -subj "/CN=$IP" \
   -keyout server.key -out server.csr
 
 openssl x509 -req -in server.csr \
   -CA ca.crt -CAkey ca.key -CAcreateserial \
-  -out server.crt -days 365
+  -out server.crt -days $DAYS
 
+# ==========================================
+# 2. MODERN CERTS (For Rust/Modern TLS)
+# ==========================================
+echo "Generating Modern v3 CERTS (with SAN)..."
 
-echo "Generating fog client certificate..."
-openssl req -newkey rsa:2048 -nodes \
-  -subj "/CN=fog-client" \
-  -keyout fog.key -out fog.csr
-
-openssl x509 -req -in fog.csr \
-  -CA ca.crt -CAkey ca.key -CAcreateserial \
-  -out fog.crt -days 365
-
-rm *.csr *.srl 
-
-echo "Certificates generated successfully."
-
-echo "Generating node CA header..."
-
-OUTPUT="../../mesh_node/certs/ca_cert.hpp"
-
-mkdir -p ../../mesh_node/certs
-
-echo "#pragma once" > $OUTPUT
-echo "" >> $OUTPUT
-echo "static const char ca_cert[] = R\"EOF(" >> $OUTPUT
-
-cat ca.crt >> $OUTPUT
-
-echo ")EOF\";" >> $OUTPUT
-
-echo "ca_cert.hpp generated successfully."# Configuration - Change these to match your environment
-CA_CN="Fog-CA"
-SERVER_CN=$IP # Your Broker IP
-CLIENT_CN="fog-node-dev"
-DAYS=365
-
-# Create a temporary OpenSSL config for v3 extensions
 cat > openssl_v3.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
-req_extensions = v3_req
-x509_extensions = v3_ca
-
+prompt = no
 [req_distinguished_name]
-commonName = Common Name
-
+CN = Fog-CA
+[v3_ca]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical, digitalSignature, cRLSign, keyCertSign
 [v3_req]
 basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-subjectAltName = @alt_names
-
-[v3_ca]
-basicConstraints = CA:TRUE
-keyUsage = digitalSignature, cRLSign, keyCertSign
-subjectAltName = @alt_names
-
-[alt_names]
-IP.1 = $IP
-IP.2 = 127.0.0.1
-DNS.1 = localhost
+subjectAltName = IP:$IP, IP:127.0.0.1, DNS:localhost
 EOF
 
-echo "1. Generating Root CA..."
+# Modern CA
 openssl genrsa -out fog-ca.key 2048
 openssl req -x509 -new -nodes -key fog-ca.key -sha256 -days $DAYS \
-    -subj "/CN=$CA_CN" -out fog-ca.crt -config openssl_v3.conf -extensions v3_ca
+    -out fog-ca.crt -config openssl_v3.conf -extensions v3_ca -subj "/CN=Fog-CA"
 
-echo "2. Generating Server Certificate (for Mosquitto)..."
+# Modern Server Cert (Listener 8884)
 openssl genrsa -out fog-server.key 2048
-openssl req -new -key fog-server.key -subj "/CN=$SERVER_CN" -out fog-server.csr
+openssl req -new -key fog-server.key -subj "/CN=$IP" -out fog-server.csr
 openssl x509 -req -in fog-server.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
     -out fog-server.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_req
 
-echo "3. Generating Client Certificate (for Rust/Arduino)..."
+# Modern Client Cert (For Rust app)
 openssl genrsa -out rust-fog.key 2048
-openssl req -new -key rust-fog.key -subj "/CN=$CLIENT_CN" -out rust-fog.csr
+openssl req -new -key rust-fog.key -subj "/CN=fog-node-dev" -out rust-fog.csr
 openssl x509 -req -in rust-fog.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
     -out rust-fog.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_req
 
-# Cleanup
-rm *.csr openssl_v3.conf fog-ca.srl
-echo "Done! Hope the certs work well for you..."
+# ==========================================
+# 3. HEADER GENERATION
+# ==========================================
+echo "Generating node CA header..."
+OUTPUT="../../mesh_node/certs/ca_cert.hpp"
+mkdir -p "../../mesh_node/certs"
+
+echo "#pragma once" > "$OUTPUT"
+echo "static const char ca_cert[] = R\"EOF(" >> "$OUTPUT"
+cat ca.crt >> "$OUTPUT" # Uses the Legacy CA
+echo ")EOF\";" >> "$OUTPUT"
+
+rm *.csr *.srl openssl_v3.conf
+echo "All certificates (Legacy & Modern) generated."

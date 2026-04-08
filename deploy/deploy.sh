@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="device"            # <--change to device name
+PI_USER="device"             # <--change to device name
 PI_IP="192.168.X.X"          # <--add ip adress to device
 PI_PASS="password"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
