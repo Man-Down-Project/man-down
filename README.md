@@ -162,30 +162,62 @@ Hierarchical mesh network responsible for **reliable multi-hop communication** b
 - Authenticated communication  
 - Replay protection  
 
-### Provisioning
+## Provisioning
 
-Managed from fog layer via MQTT.
+Provisioning is managed entirely within the fog layer and is responsible for securely distributing credentials to edge and mesh devices.
+
+### Provisioning Data
 
 The fog layer distributes:
 
 - Edge identifiers  
 - CA certificates  
-- HMAC keys (with rotation support)
+- HMAC keys (with rotation support)  
+
+Provisioning messages are published via MQTT:
 
 ### MQTT Topics
 
-- mesh/provisioning/edgeid  
-- mesh/provisioning/ca  
-- mesh/provisioning/hmac  
-- edge/provisioning/hmac  
+- `mesh/provisioning/edgeid`  
+- `mesh/provisioning/ca`  
+- `mesh/provisioning/hmac`  
+- `edge/provisioning/hmac`  
 
 Payload format and protocol details are defined in:
 
-docs/provisioning.md
+`docs/provisioning.md`
 
-Provisioning data is stored securely in EEPROM on mesh nodes.
+### BLE Provisioning Flow
 
-Provisioning is initiated by the fog layer and consumed by mesh and edge devices.
+Provisioning is exposed to edge devices through a **temporary BLE GATT service**:
+
+1. RFID `login` triggers provisioning  
+2. Fog layer starts BLE advertising  
+3. Edge device connects via BLE  
+4. HMAC payload is securely transferred  
+5. BLE service shuts down after 60 seconds  
+
+### Security Model
+
+- BLE provisioning is **not continuously available**  
+- Provisioning windows are **explicitly triggered by RFID**  
+- Only one provisioning session can run at a time (concurrency guard)  
+- HMAC keys are rotated periodically  
+- All provisioning data is handled locally  
+
+### Storage
+
+- Provisioning data is stored securely in EEPROM on mesh nodes  
+- No sensitive credentials are stored on edge devices beyond runtime needs  
+
+### System Design
+
+- Event-driven provisioning  
+- Fully local operation (no cloud dependency)  
+- Human-in-the-loop security model  
+- Time-bound exposure of sensitive interfaces  
+
+> Provisioning is designed to minimize attack surface while maintaining usability in industrial environments.
 
 ---
 
@@ -222,8 +254,8 @@ md1/v/device/+/events
 - `man_down`  
 - `battery_low`  
 - `sensor_fault`  
-- `login` *(planned)*  
-- `logout` *(planned)*  
+- `login`  
+- `logout`  
 
 ### Processing Pipeline
 
@@ -292,20 +324,51 @@ The system uses:
 
 ---
 
-## Identity & RFID (Planned)
+## Identity & RFID
 
-RFID will be used for:
+RFID is used as a **human-triggered identity and provisioning mechanism** within the system.
 
-- Worker check-in (login)  
-- Worker check-out (logout)  
-- Device association  
-- Secure key provisioning  
+### Responsibilities
 
-### Privacy Constraints
+- Worker check-in (`login`)  
+- Worker check-out (`logout`)  
+- Triggering secure provisioning sessions  
+- Associating workers with edge devices during session start  
 
-- No tracking history  
-- No behavioral analytics  
-- Only event-based storage  
+### Behavior
+
+RFID scans are processed in the fog layer and translated into system events:
+
+- First scan → `login`
+- Second scan (same tag) → `logout`
+
+These events are:
+
+- Converted into structured `Envelope` messages  
+- Processed through the same event pipeline as all other incidents  
+- Stored in the encrypted database (SQLCipher)  
+
+### Provisioning Trigger
+
+On `login`, the system:
+
+1. Registers a `login` event in the pipeline  
+2. Opens a **time-limited BLE provisioning window (60 seconds)**  
+3. Allows edge devices to securely connect and receive provisioning data  
+
+On `logout`:
+
+- A `logout` event is generated and stored  
+- No provisioning or BLE activity is triggered  
+
+### Session Management
+
+- RFID state is managed locally in the fog layer  
+- Prevents duplicate sessions  
+- Ensures correct login/logout pairing  
+- Enables deterministic behavior without cloud dependency  
+
+> RFID acts as a **secure, intentional trigger** for system interaction, ensuring that provisioning only occurs when explicitly initiated by a user.
 
 ---
 
