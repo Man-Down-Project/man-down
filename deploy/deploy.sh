@@ -3,7 +3,7 @@
 # Configuration
 PI_USER="beebee"
 PI_IP="192.168.0.29"
-PI_PASS="blablabla"
+PI_PASS="blablabla" 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
@@ -22,7 +22,7 @@ echo "🚀 Starting Deployment..."
 
 echo "📝 Generating local config files..."
 
-# 1. ACL and Password Generation
+# 1. Generate Auth Files
 cat > aclfile <<EOF
 # ===== FOG =====
 user fog_user
@@ -38,11 +38,10 @@ topic write mesh/node/#
 EOF
 
 rm -f "./passwordfile"
-# Note: Requires mosquitto-clients installed locally to run mosquitto_passwd
 mosquitto_passwd -b -c "./passwordfile" fog_user dev
 mosquitto_passwd -b "./passwordfile" mesh_user dev
 
-# 2. Systemd Service File
+# 2. Generate Systemd Service
 cat > man_down.service <<EOF
 [Unit]
 Description=Man Down Application
@@ -60,7 +59,7 @@ RestartSec=5
 WantedBy=multi-user.target 
 EOF
 
-# 3. Mosquitto Config (Added password and acl paths)
+# 3. Generate Mosquitto Config
 cat > mosquitto-dev.conf <<EOF
 listener 8883
 protocol mqtt
@@ -80,12 +79,11 @@ require_certificate true
 use_identity_as_username true
 allow_anonymous true 
 
-# Authentication
 password_file /etc/mosquitto/passwordfile
 acl_file /etc/mosquitto/aclfile
 EOF
 
-# 4. .env file
+# 4. Generate .env
 cat > .env <<EOF
 MQTT_HOST=127.0.0.1
 MQTT_PORT=8884
@@ -102,7 +100,7 @@ DB_PATH=$DEST/data/fog.db
 EOF
 
 echo "📦 Transferring files..."
-run_ssh "mkdir -p $DEST/data $DEST/certs $SCRIPTS"
+run_ssh "mkdir -p $DEST/data $DEST/state $DEST/certs $SCRIPTS"
 run_rsync "./scripts/" "$PI_USER@$PI_IP:$SCRIPTS/"
 run_rsync "$BINARY_PATH" "$PI_USER@$PI_IP:$DEST/"
 run_rsync ".env" "$PI_USER@$PI_IP:$DEST/"
@@ -114,40 +112,42 @@ run_rsync "./passwordfile" "$PI_USER@$PI_IP:$DEST/"
 echo "⚙️ Running remote configuration..."
 run_ssh "
     cd $DEST && \
+    
+    # 1. Reset Dev State (Now correctly running ON the Pi)
+    echo 'Resetting dev state on Pi...' && \
+    rm -f $DEST/data/fog.db && \
+    rm -f $DEST/state/hmac.json && \
+
+    # 2. Run your setup scripts
     sudo sh $SCRIPTS/gen-certs.sh && \
     sudo sh $SCRIPTS/gen-mqtt-auth.sh && \
-    sudo sh $SCRIPTS/reset-dev-state.sh && \
 
-    # B. Setup Mosquitto (System Copy)
+    # 3. Setup Mosquitto
     sudo mkdir -p /etc/mosquitto/certs && \
     sudo cp $DEST/certs/* /etc/mosquitto/certs/ && \
-    
-    # Move Auth Files
     sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo mv $DEST/passwordfile /etc/mosquitto/passwordfile && \
-    
-    # Set Ownership for everything in Mosquitto
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chmod 700 /etc/mosquitto/certs && \
     sudo chmod 644 /etc/mosquitto/certs/*.crt && \
     sudo chmod 600 /etc/mosquitto/certs/*.key && \
     sudo chmod 600 /etc/mosquitto/passwordfile && \
-    
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf && \
 
-    # C. Setup Rust App (Local Copy)
+    # 4. Setup Rust App Certs
     sudo chown -R $PI_USER:$PI_USER $DEST/certs && \
     chmod 644 $DEST/certs/*.crt && \
     chmod 600 $DEST/certs/*.key && \
     
-    # D. Service Management
+    # 5. Service Management
     sudo mv $DEST/man_down.service /etc/systemd/system/ && \
     sudo systemctl daemon-reload && \
     sudo systemctl restart mosquitto && \
     sudo systemctl enable man_down && \
     sudo systemctl restart man_down && \
 
-    # E. Set Capabilities
+    # 6. Capabilities
     sudo setcap 'cap_net_raw,cap_net_admin+eip' $DEST/fog
 "
+
 echo "✅ DONE! Man Down is deployed and running."
