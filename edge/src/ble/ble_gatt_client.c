@@ -155,13 +155,6 @@ static int gatt_chr_cb(uint16_t conn_handle,
                 provisioning_char_handle = chr->val_handle; 
                 ESP_LOGI(TAG, "Provisioning characteristic found!");
 
-                //provisorisk lösning "Read" tills notify är fixat på fog
-                
-                // ble_gattc_read(conn_handle,
-                //                provisioning_char_handle,
-                //                provisioning_read_cb,
-                //                NULL);
-                // return 0;
             }
         if (ble_uuid_cmp(&chr->uuid.u, &event_rx_uuid.u) == 0) {
             event_char_handle = chr->val_handle;

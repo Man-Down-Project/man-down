@@ -36,7 +36,7 @@ static void handle_event(system_event_t *ev)
             break;
         
         case EVENT_BUTTON_LONG:
-            led_set(RGB_MAGENTA, LED_MODE_SOLID, LED_PRIO_HIGH);
+            led_set(RGB_BLUE, LED_MODE_BLINK, LED_PRIO_HIGH);
             buzzer_play(BUZZER_GAS);
             edge_trigger_event(EVENT_GASLARM, 90);
             break;
