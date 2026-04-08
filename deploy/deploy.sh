@@ -3,7 +3,7 @@
 # Configuration
 PI_USER="beebee" # 👈 Add your Raspberry Pi Zero 2W username here
 PI_IP="192.168.0.29" # 👈 Add your Raspberry Pi Zero 2W ip here
-PI_PASS="Bennyhana123"  # 👈 Add your password here
+PI_PASS="blablabla"  # 👈 Add your password here
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
