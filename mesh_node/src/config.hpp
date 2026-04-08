@@ -13,6 +13,7 @@
 #define MAX_BACKUP_PARENTS 3
 #define NODE_DEPTH 1
 
+
 // MQTT client ID and Topics
 #define MQTT_TOPIC_EVENT "mesh/node/%d/edge" //For TLS
 
