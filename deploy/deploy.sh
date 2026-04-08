@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="beebee"
-PI_IP="192.168.0.29"
-PI_PASS="blablabla" 
+PI_USER="Device name"
+PI_IP="192.168.X.X"
+PI_PASS="Password" 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
@@ -38,7 +38,6 @@ topic write mesh/node/#
 EOF
 
 rm -f "./passwordfile"
-# Note: Requires mosquitto-clients installed locally
 mosquitto_passwd -b -c "./passwordfile" fog_user dev
 mosquitto_passwd -b "./passwordfile" mesh_user dev
 
@@ -60,7 +59,7 @@ RestartSec=5
 WantedBy=multi-user.target 
 EOF
 
-# 3. Generate Mosquitto Config (WITH PERSISTENCE)
+# 3. Generate Mosquitto Config
 cat > mosquitto-dev.conf <<EOF
 # --- Persistence ---
 persistence true
@@ -87,8 +86,8 @@ require_certificate true
 use_identity_as_username true
 allow_anonymous true 
 
-password_file /etc/mosquitto/passwordfile
-acl_file /etc/mosquitto/aclfile
+# password_file /etc/mosquitto/passwordfile
+# acl_file /etc/mosquitto/aclfile
 EOF
 
 # 4. Generate .env
@@ -119,6 +118,12 @@ run_rsync "./passwordfile" "$PI_USER@$PI_IP:$DEST/"
 
 echo "⚙️ Running remote configuration..."
 run_ssh "
+    # --- DEPENDENCY INSTALLATION ---
+    echo 'Checking and installing dependencies...' && \
+    sudo apt update && \
+    sudo apt install -y mosquitto mosquitto-clients bluez && \
+    sudo usermod -aG bluetooth $PI_USER && \
+    
     cd $DEST && \
     
     # 0. Set permissions for binary
@@ -131,13 +136,11 @@ run_ssh "
 
     # 2. Run your setup scripts
     sudo sh $SCRIPTS/gen-certs.sh && \
-    # sudo sh $SCRIPTS/gen-mqtt-auth.sh && \ # Commented out as you handle auth above
 
     # 3. Setup Mosquitto (System Copy)
     sudo mkdir -p /etc/mosquitto/certs && \
     sudo mkdir -p /var/lib/mosquitto && \
     
-    # Check if certs exist before copying
     if [ -d \"$DEST/certs\" ] && [ \"\$(ls -A $DEST/certs)\" ]; then
         sudo cp $DEST/certs/* /etc/mosquitto/certs/
     fi
@@ -145,7 +148,6 @@ run_ssh "
     sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo mv $DEST/passwordfile /etc/mosquitto/passwordfile && \
     
-    # Set Ownership for everything in Mosquitto folder + Persistence folder
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
     sudo chmod 700 /etc/mosquitto/certs && \
@@ -156,7 +158,7 @@ run_ssh "
     
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf && \
 
-    # 4. Setup Rust App Certs (Local Copy)
+    # 4. Setup Rust App Certs
     sudo chown -R $PI_USER:$PI_USER $DEST/certs && \
     find $DEST/certs/ -name '*.crt' -exec chmod 644 {} + && \
     find $DEST/certs/ -name '*.key' -exec chmod 600 {} + && \
