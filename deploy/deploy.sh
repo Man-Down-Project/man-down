@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Configuration
-PI_USER="beebee"             # <--change to device name
-PI_IP="192.168.0.29"          # <--add ip adress to device
-PI_PASS="Bennyhana123"           # <--change password to the device 
+PI_USER="device name"        # <--change to device name
+PI_IP="192.168.X.X"          # <--add ip adress to device
+PI_PASS="Password"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 BINARY_PATH="./fog"
@@ -165,6 +165,7 @@ run_ssh "
     
     sudo mv $DEST/man_down.service /etc/systemd/system/ && \
     sudo systemctl daemon-reload && \
+    sudo systemctl enable mosquitto && \
     sudo systemctl restart mosquitto && \
     sudo systemctl enable man_down && \
     sudo systemctl restart man_down && \
