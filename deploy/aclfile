@@ -1,0 +1,11 @@
+# ===== FOG =====
+user fog_user
+topic read mesh/node/#
+topic write mesh/provisioning/#
+topic write edge/provisioning/#
+
+# ===== MESH =====
+user mesh_user
+topic read mesh/provisioning/#
+topic read edge/provisioning/#
+topic write mesh/node/#

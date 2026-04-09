@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Configuration for your own setup
-PI_USER="beebee"        # <--change to device name
-PI_IP="192.168.0.29"          # <--add ip adress to device
-PI_PASS="Bennyhana123"
+PI_USER="pi"        # <--change to device name
+PI_IP="192.168.X.X"          # <--add ip adress to device
+PI_PASS="Password"
 DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
-WIFI_SSID="Tele2_333f71_2.4Ghz"
-WIFI_PASS="qdzjtnwi"
+WIFI_SSID="wifi namn"
+WIFI_PASS="wifi password"
 MQTT_PORT="8883"  #the listener port for arduino 
 #--------------------------------------------
 
