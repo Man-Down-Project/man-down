@@ -1,3 +1,7 @@
 deploy/pi
 .vscode/
 deploy/deploy.sh
+deploy/aclfile
+deploy/passwordfile
+deploy/mosquitto-dev.conf
+deploy/man_down.service
