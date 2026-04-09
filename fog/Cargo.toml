@@ -27,3 +27,6 @@ hex = "0.4"
 bluer = { version = "0.17", features = ["bluetoothd"] }
 uuid = "1"
 futures = "0.3"
+rppal = "0.22"
+rppal_mfrc522 = "0.4"
+anyhow = "1"

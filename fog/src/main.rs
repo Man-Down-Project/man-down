@@ -15,7 +15,7 @@ use crate::provisioning::manager::{build_initial_provisioning_messages, generate
 use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
 use crate::provisioning::scheduler::run_hmac_rotation_scheduler;
 use crate::provisioning::state::{hmac_needs_rotation, load_hmac_state, save_hmac_state};
-use crate::rfid::service::run_simulated_rfid;
+use crate::rfid::service::run_rfid;
 use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let rfid_tx = tx.clone();
     let rfid_task = tokio::spawn(async move {
-        run_simulated_rfid(rfid_tx).await;
+        run_rfid(rfid_tx).await;
     });
 
     let scheduler_tx = outgoing_tx.clone();

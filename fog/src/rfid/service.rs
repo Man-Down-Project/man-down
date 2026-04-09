@@ -2,21 +2,22 @@ use chrono::Utc;
 use tokio::sync::mpsc;
 
 use crate::events::{Envelope, Incident};
+use crate::rfid::models::{RfidAction, RfidScan};
+use crate::rfid::reader::read_from_rfid_reader;
 use crate::rfid::state::RfidSessionState;
 
-pub fn scan_to_envelope(worker_id: String, is_login: bool) -> Envelope {
-    let incident = if is_login {
-        Incident::Login {
-            worker_id: worker_id.clone(),
-        }
-    } else {
-        Incident::Logout {
-            worker_id: worker_id.clone(),
-        }
+pub fn scan_to_envelope(scan: RfidScan) -> Envelope {
+    let incident = match scan.action {
+        RfidAction::Login => Incident::Login {
+            worker_id: scan.worker_id.clone(),
+        },
+        RfidAction::Logout => Incident::Logout {
+            worker_id: scan.worker_id.clone(),
+        },
     };
 
     Envelope {
-        device_id: worker_id.clone(),
+        device_id: scan.worker_id.clone(),
         mesh_node_id: "fog-rfid".to_string(),
         seq: 1,
         mesh_timestamp: 0,
@@ -25,25 +26,36 @@ pub fn scan_to_envelope(worker_id: String, is_login: bool) -> Envelope {
     }
 }
 
-pub async fn run_simulated_rfid(tx: mpsc::Sender<Envelope>) {
+pub async fn run_rfid(tx: mpsc::Sender<Envelope>) {
     let mut state = RfidSessionState::new();
 
-    let tag_id = "worker-01".to_string();
-
     loop {
-        //simulerar blipp var 5e sekund
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        let tag_id = read_from_rfid_reader();
+
+        if tag_id.trim().is_empty() {
+            continue;
+        }
 
         let is_login = state.handle_scan(&tag_id);
 
-        let env = scan_to_envelope(tag_id.clone(), is_login);
+        let scan = RfidScan {
+            worker_id: tag_id.clone(),
+            action: if is_login {
+                RfidAction::Login
+            } else {
+                RfidAction::Logout
+            },
+        };
 
-        if let Err(e) = tx.try_send(env) {
-            log::error!("RFID: failed to sent event: {}", e);
+        let env = scan_to_envelope(scan);
+
+        if let Err(e) = tx.send(env).await {
+            log::error!("RFID: failed to send event: {}", e);
             return;
         }
+
         if is_login {
-            log::info!("RFIF: LOGIN for {}", tag_id);
+            log::info!("RFID: LOGIN for {}", tag_id);
         } else {
             log::info!("RFID: LOGOUT for {}", tag_id);
         }
