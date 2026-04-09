@@ -30,7 +30,13 @@ pub async fn run_rfid(tx: mpsc::Sender<Envelope>) {
     let mut state = RfidSessionState::new();
 
     loop {
-        let tag_id = read_from_rfid_reader();
+        let tag_id = match tokio::task::spawn_blocking(read_from_rfid_reader).await {
+            Ok(tag_id) => tag_id,
+            Err(err) => {
+                log::error!("RFID: reader task failed: {}", err);
+                continue;
+            }
+        };
 
         if tag_id.trim().is_empty() {
             continue;
