@@ -15,7 +15,8 @@ use crate::provisioning::manager::{build_initial_provisioning_messages, generate
 use crate::provisioning::models::{CaCert, EdgeIdList, HmacState, ProvisioningState};
 use crate::provisioning::scheduler::run_hmac_rotation_scheduler;
 use crate::provisioning::state::{hmac_needs_rotation, load_hmac_state, save_hmac_state};
-use crate::rfid::service::run_rfid;
+use crate::rfid::reader::start_rfid_reader_thread;
+use crate::rfid::service::run_rfid_service;
 use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
@@ -70,14 +71,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("MQTT broker: {}:{}", config.mqtt.host, config.mqtt.port);
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
+    let (tag_tx, tag_rx) = mpsc::channel::<String>(32);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
     let ble_running = Arc::new(Mutex::new(false));
 
+    start_rfid_reader_thread(tag_tx);
+
     let rfid_tx = tx.clone();
     let rfid_task = tokio::spawn(async move {
-        run_rfid(rfid_tx).await;
+        run_rfid_service(tag_rx, rfid_tx).await;
     });
 
     let scheduler_tx = outgoing_tx.clone();

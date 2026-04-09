@@ -3,7 +3,6 @@ use tokio::sync::mpsc;
 
 use crate::events::{Envelope, Incident};
 use crate::rfid::models::{RfidAction, RfidScan};
-use crate::rfid::reader::read_from_rfid_reader;
 use crate::rfid::state::RfidSessionState;
 
 pub fn scan_to_envelope(scan: RfidScan) -> Envelope {
@@ -26,18 +25,10 @@ pub fn scan_to_envelope(scan: RfidScan) -> Envelope {
     }
 }
 
-pub async fn run_rfid(tx: mpsc::Sender<Envelope>) {
+pub async fn run_rfid_service(mut tag_rx: mpsc::Receiver<String>, tx: mpsc::Sender<Envelope>) {
     let mut state = RfidSessionState::new();
 
-    loop {
-        let tag_id = match tokio::task::spawn_blocking(read_from_rfid_reader).await {
-            Ok(tag_id) => tag_id,
-            Err(err) => {
-                log::error!("RFID: reader task failed: {}", err);
-                continue;
-            }
-        };
-
+    while let Some(tag_id) = tag_rx.recv().await {
         if tag_id.trim().is_empty() {
             continue;
         }
