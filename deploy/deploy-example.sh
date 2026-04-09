@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Configuration for your own setup
-PI_USER="beebee"        # <--change to device name
-PI_IP="192.168.0.29"          # <--add ip adress to device
-PI_PASS="Bennyhana123"
+PI_USER="zero"        # <--change to device name
+PI_IP="192.168.X.X"          # <--add ip adress to device
+PI_PASS="dev"
 DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
-WIFI_SSID="Tele2_333f71_2.4Ghz"
-WIFI_PASS="qdzjtnwi"
+WIFI_SSID="wifi name"
+WIFI_PASS="wifi pass"
 MQTT_PORT="8883"  #the listener port for arduino 
 #--------------------------------------------
 
@@ -189,16 +189,6 @@ run_ssh "
 
     sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile && \
-
-D
-A
-A
-Di
-D
-D
-C
-C
-C
     
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
