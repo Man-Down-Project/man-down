@@ -3,7 +3,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-certs/ca_cert.hpp
+certs
 src/personal_setup.hpp
 data/
 src/file_handeling.cpp

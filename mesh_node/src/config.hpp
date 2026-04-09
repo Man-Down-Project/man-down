@@ -5,8 +5,6 @@
 //EEPROM Configuration
 #define USE_EEPROM  1 
 
-
-
 //node config
 #define NODE_ID 1
 #define PARENT_IP "192.168.0.2"
@@ -37,3 +35,4 @@ static const char* BACKUP_PARENTS[MAX_BACKUP_PARENTS] = {
     "192.168.0.107", //fake
     "192.168.0.108" //fake
 };
+

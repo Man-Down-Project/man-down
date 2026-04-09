@@ -255,6 +255,8 @@ void handle_hmac_provision(byte* payload, unsigned int len){
 
     authNode.updateGlobalKey(key, timestamp);
 
+    Serial.println("HMAC DONE");
+
 }
 
 

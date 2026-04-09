@@ -7,10 +7,7 @@
 #include "auth_node.hpp"
 #include "led_graphics.hpp"
 #include "time_keeper.hpp"
-
-bool systemReady = false;
-bool timeReady = false;
-bool wdTimer = false;
+#include "boot.hpp"
 
 void setup() {
 
@@ -24,39 +21,20 @@ void setup() {
   ble_init("Node_1"); //start BLE peripherals
   mqtt_init(); //connect to wifi/mqtt broker
 
+  boot_init();
+
 }
 
 void loop() {
   
   mqtt_loop();
+  boot_loop();
   
-  while(systemReady == false){
-    
-    if (!mqttClient.connected() && systemReady == false){
-      return;
-    }else if(mqttClient.connected() && timeReady == false){
-      
-      delay(500);
-
-      TimeInit();
-      timeReady = true;
-
-    }else if (timeReady && systemReady == false){
-      if (WDT.begin(4096)){
-        Serial.println("WD initialized");
-        systemReady = true;
-      }else{
-        Serial.println("WD initialization retry...");
-        return;
-      }
-    }
+  if(systemState == RUNNING){
+    ble_loop(authNode);
+    TimeSyncDaily();
+    WDT.refresh();
   }
-  
-  ble_loop(authNode); // handles BLE events and forwarding via MQTT
-  
-  WDT.refresh();
-
-  TimeSyncDaily();
 }
 
 
