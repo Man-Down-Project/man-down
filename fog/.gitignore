@@ -31,6 +31,8 @@ state/
 passwordfile
 aclfile
 
+mosquitto-dev.conf 
+
 deploy/.env
 deploy/aclfile
 deploy/man_down.service
