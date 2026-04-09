@@ -152,11 +152,16 @@ run_ssh "
     # Dependency Check
     echo 'Installing dependencies...' && \
     sudo apt update && \
-    sudo apt install -y mosquitto mosquitto-clients bluez && \
+    sudo apt install -y \
+    mosquitto \
+    mosquitto-clients\
+    bluez \
+    sqlcipher \
+    libssl-dev \
+    ca-certificates
     sudo usermod -aG bluetooth $PI_USER && \
     
     cd $DEST && \
-    
     chmod +x $DEST/fog && \
 
     echo 'Resetting dev state on Pi...' && \
