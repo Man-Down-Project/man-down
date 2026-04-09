@@ -49,8 +49,8 @@ static void handle_event(system_event_t *ev)
             
             buzzer_stop();
             led_off();onboard_led_off();
-            led_set(RGB_CYAN, LED_MODE_BLINK, LED_PRIO_HIGH);
-            onboard_led_set(RGB_CYAN, LED_MODE_BLINK, LED_PRIO_HIGH);
+            led_set(RGB_YELLOW, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_YELLOW, LED_MODE_BLINK, LED_PRIO_HIGH);
             vTaskDelay(pdMS_TO_TICKS(500));            
             led_off();onboard_led_off();
             break;
