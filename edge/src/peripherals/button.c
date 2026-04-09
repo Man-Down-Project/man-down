@@ -16,7 +16,7 @@
 #define DOUBLE_PRESS_MS 400
 #define LONG_PRESS_MS 1000
 #define LONG_RESET_MS 3000
-#define LONG_POWER_MS 10000
+#define LONG_POWER_MS 6000
 #define DEBOUNCE_MS 50
 
 static bool waiting_double_press = false;

@@ -5,6 +5,7 @@
 #include "nvs_flash.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_sleep.h"
 
 #include "system_events.h"
 #include "peripherals/buzzer.h"
@@ -56,9 +57,11 @@ static void handle_event(system_event_t *ev)
         
         case EVENT_BUTTON_DOUBLE:
 
-            led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_MEDIUM);
-            onboard_led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_MEDIUM);
-            break;
+            led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_HIGH);
+            vTaskDelay(pdMS_TO_TICKS(500));
+            nvs_flash_erase();
+            esp_restart();
         
         case EVENT_FALL_ALARM:
 
@@ -69,11 +72,16 @@ static void handle_event(system_event_t *ev)
             break;
             
         case EVENT_BUTTON_POWER:
-            led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_HIGH);
-            onboard_led_set(RGB_MAGENTA, LED_MODE_BLINK, LED_PRIO_HIGH);
-            vTaskDelay(pdMS_TO_TICKS(500));
+            led_set(RGB_YELLOW, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_YELLOW, LED_MODE_BLINK, LED_PRIO_HIGH);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            onboard_led_set(RGB_RED, LED_MODE_SOLID, LED_PRIO_HIGH);
+            led_set(RGB_RED, LED_MODE_SOLID, LED_PRIO_HIGH);
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            led_off();
+            onboard_led_off();
             nvs_flash_erase();
-            esp_restart();
+            esp_deep_sleep_start();
 
         default:
             break;
