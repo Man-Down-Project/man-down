@@ -1,0 +1,17 @@
+[Unit]
+Description=Man Down Application
+After=network.target bluetooth.service mosquitto.service
+
+[Service]
+Type=simple
+User=beebee
+WorkingDirectory=/home/beebee/man_down
+EnvironmentFile=/home/beebee/man_down/.env
+ExecStart=/home/beebee/man_down/fog
+Restart=always
+RestartSec=5
+
+
+
+[Install]
+WantedBy=multi-user.target 

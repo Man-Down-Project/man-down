@@ -189,16 +189,6 @@ run_ssh "
 
     sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile && \
-
-D
-A
-A
-Di
-D
-D
-C
-C
-C
     
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
