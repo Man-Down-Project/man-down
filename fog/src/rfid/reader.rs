@@ -22,6 +22,7 @@ fn try_read_from_rfid_reader() -> Result<String, Box<dyn std::error::Error + Sen
         match rfid.uid(Duration::from_millis(250)) {
             Ok(uid) => {
                 let tag_id = format!("{:08X}", uid.to_u32());
+                log::info!("RFID: read tag {}", tag_id);
                 return Ok(tag_id);
             }
             Err(_) => {
