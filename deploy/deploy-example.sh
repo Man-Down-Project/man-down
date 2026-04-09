@@ -167,10 +167,11 @@ run_ssh "
     bluez \
     sqlcipher \
     libssl-dev \
-    ca-certificates
+    ca-certificates && \
     sudo usermod -aG bluetooth $PI_USER && \
     
     cd $DEST && \
+    chmod 644 $DEST/.env && \
     chmod +x $DEST/fog && \
 
     echo 'Resetting dev state on Pi...' && \
@@ -205,11 +206,14 @@ run_ssh "
     find $DEST/certs/ -name '*.key' -exec chmod 600 {} + && \
     
     sudo mv $DEST/man_down.service /etc/systemd/system/ && \
+    sudo systemctl daemon-reexec && \
     sudo systemctl daemon-reload && \
     sudo systemctl enable mosquitto && \
     sudo systemctl restart mosquitto && \
     sudo systemctl enable man_down && \
     sudo systemctl restart man_down && \
+    echo '--- ENV DEBUG ---' && \
+    sudo systemctl show man_down --property=Environment && \
 
     sudo setcap 'cap_net_raw,cap_net_admin+eip' $DEST/fog
 "
