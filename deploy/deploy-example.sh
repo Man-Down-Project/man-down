@@ -214,6 +214,23 @@ run_ssh "
     sudo systemctl restart man_down && \
     echo '--- ENV DEBUG ---' && \
     sudo systemctl show man_down --property=Environment && \
+    echo 'Enabling SPI...' && \
+
+# Enable SPI via config.txt (works on all Pi versions)
+    if ! grep -q '^dtparam=spi=on' /boot/config.txt; then
+        echo 'dtparam=spi=on' | sudo tee -a /boot/config.txt
+    fi && \
+
+    # Ensure SPI kernel module loads
+    sudo modprobe spi_bcm2835 && \
+
+    # Add user to spi group
+    sudo usermod -aG spi $PI_USER && \
+
+    # Verify device exists
+    if [ ! -e /dev/spidev0.0 ]; then
+    echo '⚠️ SPI device not found, reboot required'
+    fi && \
 
     sudo setcap 'cap_net_raw,cap_net_admin+eip' $DEST/fog
 "
