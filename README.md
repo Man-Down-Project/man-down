@@ -560,8 +560,7 @@ Supports compliance with:
 ---
 
 ## Future Improvements
-
-- RFID integration (identity + provisioning)  
+ 
 - Indoor positioning (trilateration)  
 - Secure hardware element (key storage)  
 - High-availability fog cluster  
