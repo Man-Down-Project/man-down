@@ -77,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let ble_running = Arc::new(Mutex::new(false));
 
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     start_rfid_reader_thread(tag_tx);
 
     let rfid_tx = tx.clone();
