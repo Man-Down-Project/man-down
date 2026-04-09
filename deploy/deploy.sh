@@ -49,6 +49,12 @@ echo "📝 Generating local config files..."
 
 # 1. Generate Auth Files
 cat > aclfile <<EOF
+# ===== FOG (Rust APP) =====
+user fog-node-dev
+topic read mesh/node/#
+topic write mesh/provisioning/#
+topic write edge/provisioning/#
+
 # ===== FOG =====
 user fog_user
 topic read mesh/node/#
