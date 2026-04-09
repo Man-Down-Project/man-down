@@ -1,5 +1,7 @@
 ## Notes
 
-MQTT is on QOS0, HIGHER QOS is not compattible with the current library
+MQTT is on QOS0, HIGHER QOS is not compatible with the current library
 
-Possible fix: Wright own logick by storing tata pack and seq in a que after send to compare aganinst an ack topicd
+Possible fix: Wright own logic by storing tata pack and seq in a que after send to compare against an ack topic
+
+no ca provision implemented do to data store restraints. 

@@ -67,6 +67,13 @@ void AuthNode::loadAuthorizedEdges() {
             _ram_auth.device_whitelist[i] = EMPTY_ID;
         }
         EEPROM.put(0, _ram_auth);
+
+        eeprom_global_auth verify;
+        EEPROM.get(0, verify);
+
+        if(memcmp(&verify, &_ram_auth, sizeof(_ram_auth)) != 0){
+            Serial.println("EEPROM wright failed");
+        }
     }
 }
 

@@ -27,6 +27,12 @@ void setup() {
 
 void loop() {
   
+  if(systemState == RESTART_PENDING){
+    Serial.println("System restarting...");
+    delay(500);
+    NVIC_SystemReset();
+  }
+
   mqtt_loop();
   boot_loop();
   

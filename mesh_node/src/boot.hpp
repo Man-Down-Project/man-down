@@ -8,7 +8,8 @@ enum SystemState : uint8_t {
     WAIT_MQTT,
     INIT_TIME,
     INIT_WDT,
-    RUNNING
+    RUNNING,
+    RESTART_PENDING
 };
 
 void boot_init();

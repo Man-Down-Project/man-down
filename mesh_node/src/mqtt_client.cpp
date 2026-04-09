@@ -6,6 +6,8 @@
 #include "../certs/ca_cert.hpp"
 #include "time_keeper.hpp"
 #include "auth_node.hpp"
+#include "boot.hpp"
+#include <SHA256.h>
 
 struct childEvent_t {
     edge_event_out msg;
@@ -34,7 +36,7 @@ void mqtt_init() {
 
     mqttClient.setCallback(mqtt_callback);
 
-    mqttClient.setBufferSize(256);
+    mqttClient.setBufferSize(1500);
 
     //choosing broker
     if (NODE_DEPTH == 1){
@@ -146,18 +148,11 @@ void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int len
     }else if(strcmp(topic, "mesh/provisioning/hmac") == 0){
         Serial.println("Initiating HMAC key provisioning");
         handle_hmac_provision(payload, length);
-
+    /*    
     }else if (strcmp(topic, "mesh/provisioning/ca") == 0){
-
-        Serial.println("Provisioning: New CA received");
-
-        char newCA[length +1];
-        memcpy(newCA, payload, length);
-        newCA[length] = '\0';
-
-        Serial.println("Rebooting to apply new CA...");
-        delay(500);
-        NVIC_SystemReset();
+        Serial.println("Initiating CA provisioning");
+        handle_ca_provision(payload, length);
+    */
     }else{
         return;
     }
@@ -259,20 +254,6 @@ void handle_hmac_provision(byte* payload, unsigned int len){
 
 }
 
-
-void mqtt_callback(char* topic, byte* payload, unsigned int length){
-    mqtt_provision_handeling(topic, payload, length);
-}
-
-bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id) {
-    if (!mqttClient.connected())
-    return false;
-
-    char forward_topic[MAX_TOPIC_SIZE];
-    snprintf(forward_topic, sizeof(forward_topic), "mesh/node/%d/edge", original_node_id);
-
-    return mqttClient.publish(forward_topic, (uint8_t*)msg, sizeof(edge_event_out));
-}
 
 void mqtt_loop(){
 
