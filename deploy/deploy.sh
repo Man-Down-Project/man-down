@@ -120,7 +120,7 @@ cat > .env <<EOF
 MQTT_HOST=$PI_IP
 MQTT_PORT=8884
 MQTT_CLIENT_ID=fog-node-dev
-MQTT_TOPIC=mesh/node/#
+MQTT_TOPICS=mesh/node/#
 
 MQTT_USE_TLS=true
 
