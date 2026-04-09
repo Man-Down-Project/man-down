@@ -1,13 +1,25 @@
 #!/bin/bash
 
-# Configuration
+# Configuration for your own setup
 PI_USER="beebee"        # <--change to device name
-PI_IP="192.168.X.X"          # <--add ip adress to device
-PI_PASS="password"           # <--change password to the device 
+PI_IP="192.168.0.29"          # <--add ip adress to device
+PI_PASS="Bennyhana123"
+DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
+WIFI_SSID="Tele2_333f71_2.4Ghz"
+WIFI_PASS="qdzjtnwi"
+MQTT_PORT="8883"  #the listener port for arduino 
+#--------------------------------------------
+
+LOCAL_HEADER_DIR="../mesh_node/certs"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
-BINARY_PATH="./fog"
-DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
+# BINARY_PATH="./fog" # <--- använd den här med binary från github actions
+
+
+# CROSS COMPILATION CONFIG
+TARGET="armv7-unknown-linux-gnueabihf"
+BINARY_NAME="fog"
+LOCAL_BINARY_PATH="./target/$TARGET/release/$BINARY_NAME"
 
 # Helper function to run commands with password
 run_ssh() {
@@ -18,6 +30,19 @@ run_rsync() {
     sshpass -p "$PI_PASS" rsync -avz -e "ssh -o StrictHostKeyChecking=no" "$1" "$2"
 }
 
+echo "🛠️  Step 0: Local Cross-Compilation..."
+
+# kommentera ut koden från den här kommentaren
+# till strecket och använd den utkommenterade koden i scriptet istället
+# om ni laddar ner binary från github actions och lägger manuellt i deploy mappen.
+cross build --release --target $TARGET
+
+# Stop script if build failed
+if [ $? -ne 0 ]; then
+    echo "❌ Build failed! Aborting deployment."
+    exit 1
+fi
+# ----------------------------------------------------------
 echo "🚀 Starting Deployment..."
 
 echo "📝 Generating local config files..."
@@ -114,7 +139,8 @@ EOF
 echo "📦 Transferring files..."
 run_ssh "mkdir -p $DEST/data $DEST/state $DEST/certs $SCRIPTS"
 run_rsync "./scripts/" "$PI_USER@$PI_IP:$SCRIPTS/"
-run_rsync "$BINARY_PATH" "$PI_USER@$PI_IP:$DEST/"
+# run_rsync "$BINARY_PATH" "$PI_USER@$PI_IP:$DEST/" # <--- använd vid github actions
+run_rsync "$LOCAL_BINARY_PATH" "$PI_USER@$PI_IP:$DEST/$BINARY_NAME" # <--- kommentera ut om ni använder github actions
 run_rsync ".env" "$PI_USER@$PI_IP:$DEST/"
 run_rsync "./man_down.service" "$PI_USER@$PI_IP:$DEST/"
 run_rsync "./mosquitto-dev.conf" "$PI_USER@$PI_IP:$DEST/"
@@ -174,6 +200,36 @@ run_ssh "
 "
 
 echo "✅ DONE! Man Down is deployed and running."
+echo "🔄 Syncing generated C++ headers back to laptop..."
+
+# Define where the file was generated ON THE PI
+REMOTE_HEADER="/home/$PI_USER/mesh_node/certs/ca_cert.hpp"
+
+# Define where it should go ON YOUR PC
+
+mkdir -p "$LOCAL_HEADER_DIR"
+
+# PULL the file from the Pi to your PC
+sshpass -p "$PI_PASS" scp -o StrictHostKeyChecking=no "$PI_USER@$PI_IP:$REMOTE_HEADER" "$LOCAL_HEADER_DIR/ca_cert.hpp"
+
+echo "✅ Local C++ headers updated from Pi."
+
+# Define the path
+SETUP_OUTPUT="../mesh_node/src/personal_setup.hpp"
+
+echo "Generating personal setup header at $SETUP_OUTPUT"
+
+cat > "$SETUP_OUTPUT" <<EOF
+
+#pragma once
+//wifi config
+#define WIFI_SSID "$WIFI_SSID"
+#define WIFI_PASS "$WIFI_PASS"
+
+//MQTT config
+#define MQTT_BROKER "$PI_IP"
+#define MQTT_PORT $MQTT_PORT
+EOF
 
 cat << "EOF"
 
@@ -231,3 +287,4 @@ cat << "EOF"
           ▓▓  ▓▓    ▓▓  ▓▓        ▓▓        ▓▓              ▓▓        ▓▓
   ░░▓▓▓▓██      ▓▓▓▓▓▓    ▓▓▓▓██    ▓▓▓▓▒▒    ▓▓▓▓▓▓  ▓▓▓▓▓▓    ▓▓▓▓▓▓  
 EOF
+

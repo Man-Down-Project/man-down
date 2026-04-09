@@ -38,7 +38,7 @@ pub async fn run_simulated_rfid(tx: mpsc::Sender<Envelope>) {
 
         let env = scan_to_envelope(tag_id.clone(), is_login);
 
-        if let Err(e) = tx.send(env).await {
+        if let Err(e) = tx.try_send(env) {
             log::error!("RFID: failed to sent event: {}", e);
             return;
         }
