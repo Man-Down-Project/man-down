@@ -33,15 +33,16 @@ pub async fn run_rfid_service(mut tag_rx: mpsc::Receiver<String>, tx: mpsc::Send
             continue;
         }
 
-        let is_login = state.handle_scan(&tag_id);
+        let action = state.handle_scan(&tag_id);
+
+        match action {
+            RfidAction::Login => log::info!("RFID: LOGIN for {}", tag_id),
+            RfidAction::Logout => log::info!("RFID: LOGOUT for {}", tag_id),
+        }
 
         let scan = RfidScan {
             worker_id: tag_id.clone(),
-            action: if is_login {
-                RfidAction::Login
-            } else {
-                RfidAction::Logout
-            },
+            action,
         };
 
         let env = scan_to_envelope(scan);
@@ -49,12 +50,6 @@ pub async fn run_rfid_service(mut tag_rx: mpsc::Receiver<String>, tx: mpsc::Send
         if let Err(e) = tx.send(env).await {
             log::error!("RFID: failed to send event: {}", e);
             return;
-        }
-
-        if is_login {
-            log::info!("RFID: LOGIN for {}", tag_id);
-        } else {
-            log::info!("RFID: LOGOUT for {}", tag_id);
         }
     }
 }

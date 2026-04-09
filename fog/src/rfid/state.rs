@@ -1,3 +1,4 @@
+use crate::rfid::models::RfidAction;
 use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
@@ -12,13 +13,13 @@ impl RfidSessionState {
         }
     }
 
-    pub fn handle_scan(&mut self, tag_id: &str) -> bool {
+    pub fn handle_scan(&mut self, tag_id: &str) -> RfidAction {
         if self.logged_in_tags.contains(tag_id) {
             self.logged_in_tags.remove(tag_id);
-            false
+            RfidAction::Logout
         } else {
             self.logged_in_tags.insert(tag_id.to_string());
-            true
+            RfidAction::Login
         }
     }
 
