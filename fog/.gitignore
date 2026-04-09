@@ -30,3 +30,9 @@ state/
 # MQTT local broker files
 passwordfile
 aclfile
+
+deploy/.env
+deploy/aclfile
+deploy/man_down.service
+deploy/mosquitto-dev.conf
+deploy/passwordfile
