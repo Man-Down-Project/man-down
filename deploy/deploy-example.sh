@@ -324,3 +324,5 @@ cat << "EOF"
   ░░▓▓▓▓██      ▓▓▓▓▓▓    ▓▓▓▓██    ▓▓▓▓▒▒    ▓▓▓▓▓▓  ▓▓▓▓▓▓    ▓▓▓▓▓▓  
 EOF
 
+echo 'Rebooting Zero to apply SPI changes! '
+sudo reboot
