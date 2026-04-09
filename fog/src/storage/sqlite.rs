@@ -70,8 +70,8 @@ fn verify_database_access(conn: &Connection) -> Result<()> {
 
 fn configure_connection(conn: &Connection) -> Result<()> {
     conn.pragma_update(None, "foreign_keys", "ON")?;
-    //conn.pragma_update(None, "journal_mode", "WAL")?;
-    //conn.pragma_update(None, "synchronous", "NORMAL")?;
+    conn.pragma_update(None, "journal_mode", "WAL")?;
+    conn.pragma_update(None, "synchronous", "NORMAL")?;
     //conn.pragma_update(None, "kdf_iter", 256000)?;
     conn.busy_timeout(Duration::from_secs(5))?;
     Ok(())

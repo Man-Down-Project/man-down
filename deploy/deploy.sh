@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Configuration for your own setup
-PI_USER="pi"        # <--change to device name
-PI_IP="192.168.X.X"          # <--add ip adress to device
-PI_PASS="Password"
+PI_USER="beebee"        # <--change to device name
+PI_IP="192.168.0.29"          # <--add ip adress to device
+PI_PASS="Bennyhana123"
 DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
-WIFI_SSID="wifi namn"
-WIFI_PASS="wifi password"
+WIFI_SSID="Tele2_333f71_2.4Ghz"
+WIFI_PASS="qdzjtnwi"
 MQTT_PORT="8883"  #the listener port for arduino 
 #--------------------------------------------
 
@@ -76,15 +76,18 @@ mosquitto_passwd -b "./passwordfile" mesh_user dev
 cat > man_down.service <<EOF
 [Unit]
 Description=Man Down Application
-After=network.target bluetooth.service
+After=network.target bluetooth.service mosquitto.service
 
 [Service]
 Type=simple
 User=$PI_USER
 WorkingDirectory=$DEST
+EnvironmentFile=$DEST/.env
 ExecStart=$DEST/fog
 Restart=always
 RestartSec=5
+
+
 
 [Install]
 WantedBy=multi-user.target 
@@ -114,7 +117,7 @@ cafile /etc/mosquitto/certs/fog-ca.crt
 certfile /etc/mosquitto/certs/fog-server.crt
 keyfile /etc/mosquitto/certs/fog-server.key
 require_certificate true
-use_identity_as_username false
+use_identity_as_username true
 allow_anonymous false 
 
 password_file /etc/mosquitto/passwordfile
@@ -183,8 +186,19 @@ run_ssh "
         sudo cp $DEST/certs/* /etc/mosquitto/certs/
     fi
     
-    sudo cp $DEST/aclfile /etc/mosquitto/aclfile && \
+
+    sudo mv $DEST/aclfile /etc/mosquitto/aclfile && \
     sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile && \
+
+D
+A
+A
+Di
+D
+D
+C
+C
+C
     
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
     sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
