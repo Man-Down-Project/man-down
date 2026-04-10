@@ -1,5 +1,3 @@
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -89,7 +87,7 @@ pub async fn start_ble_server(
                 uuid: char_uuid,
                 read: Some(CharacteristicRead {
                     read: true,
-                    encrypt_read: true,
+                    encrypt_read: false,
                     fun: Box::new({
                         let hmac_key = data.hmac_key.clone();
                         move |_req| {
@@ -159,16 +157,16 @@ pub async fn start_ble_server(
     tokio::select! {
         _ = stop => {
             log::info!("BLE: stop signal received");
-    }
-    _ = tokio::signal::ctrl_c() => {
-        log::info!("BLE: received SIGINT/SIGTERM, shutting down");
-    }
+        }
+        _ = tokio::signal::ctrl_c() => {
+            log::info!("BLE: received SIGINT/SIGTERM, shutting down");
+        }
         _ = async {
             loop {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-        }
-    } => {}
-}
+            }
+        } => {}
+    }.await;
 rfid_enabled.store(true, Ordering::Relaxed);
 log::info!("RFID: resumed after provisioning");
 

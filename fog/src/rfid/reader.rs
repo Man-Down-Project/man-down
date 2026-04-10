@@ -25,6 +25,8 @@ fn run_reader_loop(
     // let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
     // let mut rfid = Mfrc522::new(&mut spi);
     println!("RFID: initializing SPI...");
+    let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
+    println!("RFID: SPI initialized");
     let gpio = Gpio::new()?;
     let mut rst = gpio.get(25)?.into_output();
 
@@ -32,8 +34,7 @@ fn run_reader_loop(
     thread::sleep(Duration::from_millis(300));
     rst.set_high();
     thread::sleep(Duration::from_millis(300));
-    let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
-    println!("RFID: SPI initialized");
+    
    
 
     let mut rfid = Mfrc522::new(&mut spi);
@@ -48,7 +49,7 @@ fn run_reader_loop(
     loop {
     // 🔥 PAUSE RFID WHEN DISABLED
         if !enabled.load(Ordering::Relaxed) {
-            thread::sleep(Duration::from_millis(300));
+            thread::sleep(Duration::from_millis(500));
             continue;
         }
         
@@ -66,7 +67,7 @@ fn run_reader_loop(
                 println!("RFID: detected tag {}", tag_id);
                 log::info!("RFID: read tag {}", tag_id);
 
-                if let Err(err) = tag_tx.blocking_send(tag_id) {
+                if let Err(err) = tag_tx.try_send(tag_id) {
                     log::error!("RFID: failed to forward tag to async service: {}", err);
                     continue;
                 }
@@ -77,14 +78,14 @@ fn run_reader_loop(
                 match err {
                     Error::Timeout => {
                     // normal → ignore
-            }
-            _ => {
-                println!("RFID error: {:?}", err);
-            }
-        }
+                    }
+                    _ => {
+                        println!("RFID error: {:?}", err);
+                    }
+                }
 
-    thread::sleep(Duration::from_millis(200));
-}
+                thread::sleep(Duration::from_millis(200));
+            }
         }
     }
 }

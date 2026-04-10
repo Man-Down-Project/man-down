@@ -21,7 +21,8 @@ use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+// use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool};
 use tokio::sync::{Mutex, mpsc, watch};
 
 
@@ -78,7 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
     let ble_running = Arc::new(Mutex::new(false));
-    use std::sync::atomic::{AtomicBool, Ordering};
+    
 
     let rfid_enabled = Arc::new(AtomicBool::new(true));
 
@@ -166,9 +167,12 @@ async fn run_processor(
     log::info!("Processor: channel closed, exiting");
 }
 
-async fn process_envelope(env: Envelope, 
-                          ble_running: Arc<Mutex<bool>>,
-                          rfid_enabled: Arc<AtomicBool>,) {
+async fn process_envelope(
+    env: Envelope,
+    ble_running: Arc<Mutex<bool>>,
+    rfid_enabled: Arc<AtomicBool>,
+) {
+    let _ = &rfid_enabled;
     log::info!(
         "Processing device_id={} seq={} incident={:?}",
         env.device_id,
@@ -213,11 +217,11 @@ async fn process_envelope(env: Envelope,
             let ble_running_for_timer = ble_running.clone();
 
             let (tx, rx) = tokio::sync::oneshot::channel();
-
+            let rfid_enabled_for_ble = rfid_enabled.clone();
             tokio::spawn(async move {
                 log::info!("BLE: starting provisioning (60s window)");
 
-                if let Err(e) = start_ble_server(ble_data, rx, rfid_enabled.clone()).await {
+                if let Err(e) = start_ble_server(ble_data, rx, rfid_enabled_for_ble).await {
                     log::error!("BLE error: {}", e);
                 }
 
