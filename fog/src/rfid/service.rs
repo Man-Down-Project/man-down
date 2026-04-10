@@ -5,7 +5,7 @@ use crate::events::{Envelope, Incident};
 use crate::rfid::models::{RfidAction, RfidScan};
 use crate::rfid::state::RfidSessionState;
 
-pub fn scan_to_envelope(tag_id: String, scan: RfidScan) -> Envelope {
+pub fn scan_to_envelope(tag_id: String, scan: RfidScan, seq: u8) -> Envelope {
     let incident = match scan.action {
         RfidAction::Login => Incident::Login {
             worker_id: scan.worker_id.clone(),
@@ -18,7 +18,7 @@ pub fn scan_to_envelope(tag_id: String, scan: RfidScan) -> Envelope {
     Envelope {
         device_id: tag_id,
         mesh_node_id: "fog-rfid".to_string(),
-        seq: 1,
+        seq,
         mesh_timestamp: 0,
         received_at: Utc::now(),
         incident,
@@ -27,6 +27,7 @@ pub fn scan_to_envelope(tag_id: String, scan: RfidScan) -> Envelope {
 
 pub async fn run_rfid_service(mut tag_rx: mpsc::Receiver<String>, tx: mpsc::Sender<Envelope>) {
     let mut state = RfidSessionState::new();
+    let mut seq: u8 = 1;
 
     while let Some(tag_id) = tag_rx.recv().await {
         if tag_id.trim().is_empty() {
@@ -51,11 +52,12 @@ pub async fn run_rfid_service(mut tag_rx: mpsc::Receiver<String>, tx: mpsc::Send
             action,
         };
 
-        let env = scan_to_envelope(tag_id.clone(), scan);
+        let env = scan_to_envelope(tag_id.clone(), scan, seq);
 
         if let Err(e) = tx.send(env).await {
             log::error!("RFID: failed to send event: {}", e);
             return;
         }
+        seq = if seq == 255 { 1 } else { seq + 1 };
     }
 }

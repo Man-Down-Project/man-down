@@ -22,9 +22,8 @@ use chrono::Utc;
 use std::fs;
 use std::sync::Arc;
 // use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicBool};
+use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
-
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -79,7 +78,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
     let ble_running = Arc::new(Mutex::new(false));
-    
 
     let rfid_enabled = Arc::new(AtomicBool::new(true));
 
@@ -219,7 +217,7 @@ async fn process_envelope(
             let (tx, rx) = tokio::sync::oneshot::channel();
             let rfid_enabled_for_ble = rfid_enabled.clone();
             tokio::spawn(async move {
-                log::info!("BLE: starting provisioning (60s window)");
+                log::info!("BLE: starting provisioning (10 secound window)");
 
                 if let Err(e) = start_ble_server(ble_data, rx, rfid_enabled_for_ble).await {
                     log::error!("BLE error: {}", e);
