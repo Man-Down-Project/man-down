@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
 pub fn start_rfid_reader_thread(tag_tx: mpsc::Sender<String>) {
+    println!("RFID: reader thread starting...");
     thread::spawn(move || {
         if let Err(err) = run_reader_loop(tag_tx) {
             log::error!("RFID: reader thread exited with error: {}", err);
@@ -15,10 +16,18 @@ pub fn start_rfid_reader_thread(tag_tx: mpsc::Sender<String>) {
 fn run_reader_loop(
     tag_tx: mpsc::Sender<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
+    // let mut rfid = Mfrc522::new(&mut spi);
+    println!("RFID: initializing SPI...");
+
     let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
+    println!("RFID: SPI initialized");
+
     let mut rfid = Mfrc522::new(&mut spi);
+    println!("RFID: MFRC522 created");
 
     rfid.reset()?;
+    println!("RFID: reader reset OK");
 
     let mut last_tag = String::new();
     let mut last_seen = Instant::now() - Duration::from_secs(5);
@@ -44,6 +53,7 @@ fn run_reader_loop(
                 }
             }
             Err(_) => {
+                println!("RFID: read error: {:?}", err);
                 thread::sleep(Duration::from_millis(100));
             }
         }
