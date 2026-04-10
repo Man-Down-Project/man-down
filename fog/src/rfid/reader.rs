@@ -32,7 +32,7 @@ fn run_reader_loop(
     rst.set_high();
     thread::sleep(Duration::from_millis(300));
 
-    let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
+    let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 500_000, Mode::Mode0)?;
     println!("RFID: SPI initialized");
 
     let mut rfid = Mfrc522::new(&mut spi);
