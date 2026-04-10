@@ -166,7 +166,8 @@ pub async fn start_ble_server(
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             }
         } => {}
-    }.await;
+    }
+
 rfid_enabled.store(true, Ordering::Relaxed);
 log::info!("RFID: resumed after provisioning");
 
