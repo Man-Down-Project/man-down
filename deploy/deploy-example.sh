@@ -62,6 +62,7 @@ cat > man_down.service <<EOF
 Description=Man Down Application
 After=network.target bluetooth.service mosquitto.service
 Requires=bluetooth.service
+ExecStartPre=/bin/sleep 2
 
 [Service]
 Type=simple
@@ -141,7 +142,7 @@ run_rsync "./passwordfile" "$PI_USER@$PI_IP:$DEST/"
 
 echo "⚙️ Running remote configuration..."
 run_ssh "
-    sudo apt update && sudo apt install -y mosquitto mosquitto-clients bluez sqlcipher libssl-dev libdbus-1-dev ca-certificates
+    sudo apt update && sudo apt install -y mosquitto mosquitto-clients bluez bluez-tools sqlcipher libssl-dev libdbus-1-dev ca-certificates
     
     # Enable hardware and add user to groups
     sudo raspi-config nonint do_spi 0
@@ -183,7 +184,7 @@ DBUS\"
     sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ /var/lib/mosquitto/
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf
-
+    sudo chown -R $PI_USER:$PI_USER $DEST
     # Fix Bluetooth Service plugins
     sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap|' /lib/systemd/system/bluetooth.service
     
@@ -192,6 +193,7 @@ DBUS\"
     sudo hciconfig hci0 up
     sudo btmgmt power on
     sudo btmgmt connectable on
+    sudo btmgmt pairable on
     sudo btmgmt discoverable on
     sudo systemctl restart bluetooth
     sudo systemctl restart mosquitto
