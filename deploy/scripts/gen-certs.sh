@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-IP=$(hostname -I | awk '{print $1}')
+IP=${1:? "Usage: $0 <PI_IP>"}
 echo "Detected broker IP: $IP"
 
 mkdir -p certs

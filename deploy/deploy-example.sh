@@ -29,6 +29,8 @@ run_rsync() {
 }
 
 echo "🛠️  Step 0: Local Cross-Compilation..."
+echo "🔐 Generating certificates locally..."
+./scripts/gen-certs.sh "$PI_IP"
 cross build --release --target $TARGET
 
 if [ $? -ne 0 ]; then
@@ -176,7 +178,7 @@ DBUS\"
     sudo rm -f /var/lib/mosquitto/mosquitto.db
     rm -f $DEST/data/fog.db $DEST/state/hmac.json
 
-    sudo sh $SCRIPTS/gen-certs.sh
+    #sudo sh $SCRIPTS/gen-certs.sh
     sudo mkdir -p /etc/mosquitto/certs /var/lib/mosquitto
     
     if [ -d \"$DEST/certs\" ] && [ \"\$(ls -A $DEST/certs)\" ]; then
