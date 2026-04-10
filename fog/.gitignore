@@ -8,7 +8,7 @@ certs2/
 
 # Local configuration
 .env
-
+man_down.service
 # Logs
 *.log
 
