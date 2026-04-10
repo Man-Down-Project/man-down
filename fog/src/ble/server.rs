@@ -106,39 +106,39 @@ pub async fn start_ble_server(
                     }),
                     ..Default::default()
                 }),
-                notify: Some(CharacteristicNotify {
-                    notify: true,
-                    indicate: true,
-                    method: CharacteristicNotifyMethod::Fun(Box::new({
-                        let hmac_key = data.hmac_key.clone();
-                        move |mut notifier| {
-                            let value = match hex::decode(&hmac_key) {
-                                Ok(v) => v,
-                                Err(err) => {
-                                    log::error!(
-                                        "BLE: failed to decode HMAC payload for notify: {}",
-                                        err
-                                    );
-                                    return async move {}.boxed();
-                                }
-                            };
-                            async move {
-                                log::info!(
-                                    "BLE: notify session started (confirming={:?})",
-                                    notifier.confirming()
-                                );
+                // notify: Some(CharacteristicNotify {
+                //     notify: true,
+                //     indicate: true,
+                //     method: CharacteristicNotifyMethod::Fun(Box::new({
+                //         let hmac_key = data.hmac_key.clone();
+                //         move |mut notifier| {
+                //             let value = match hex::decode(&hmac_key) {
+                //                 Ok(v) => v,
+                //                 Err(err) => {
+                //                     log::error!(
+                //                         "BLE: failed to decode HMAC payload for notify: {}",
+                //                         err
+                //                     );
+                //                     return async move {}.boxed();
+                //                 }
+                //             };
+                //             async move {
+                //                 log::info!(
+                //                     "BLE: notify session started (confirming={:?})",
+                //                     notifier.confirming()
+                //                 );
 
-                                if let Err(err) = notifier.notify(value).await {
-                                    log::error!("BLE: notify failed: {}", err);
-                                } else {
-                                    log::info!("BLE: HMAC sent via notify/indicate");
-                                }
-                            }
-                            .boxed()
-                        }
-                    })),
-                    ..Default::default()
-                }),
+                //                 if let Err(err) = notifier.notify(value).await {
+                //                     log::error!("BLE: notify failed: {}", err);
+                //                 } else {
+                //                     log::info!("BLE: HMAC sent via notify/indicate");
+                //                 }
+                //             }
+                //             .boxed()
+                //         }
+                //     })),
+                //     ..Default::default()
+                // }),
                 ..Default::default()
             }],
             ..Default::default()
