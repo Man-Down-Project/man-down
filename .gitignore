@@ -4,5 +4,4 @@ deploy/deploy.sh
 deploy/aclfile
 deploy/passwordfile
 deploy/mosquitto-dev.conf
-deploy/man_down.service
 fog/man_down.service
