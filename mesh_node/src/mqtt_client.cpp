@@ -139,6 +139,20 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
     );
 }
 
+bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id) {
+    if (!mqttClient.connected())
+    return false;
+
+    char forward_topic[MAX_TOPIC_SIZE];
+    snprintf(forward_topic, sizeof(forward_topic), "mesh/node/%d/edge", original_node_id);
+
+    return mqttClient.publish(forward_topic, (uint8_t*)msg, sizeof(edge_event_out));
+}
+
+void mqtt_callback(char* topic, byte* payload, unsigned int length){
+    mqtt_provision_handeling(topic, payload, length);
+}
+
 void mqtt_provision_handeling(const char* topic, byte* payload, unsigned int length) {
 
     if(strcmp(topic, "mesh/provisioning/edgeid") == 0){

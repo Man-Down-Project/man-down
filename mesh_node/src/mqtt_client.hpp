@@ -17,5 +17,6 @@ void handle_edgeid_provision(byte* payload, unsigned int length);
 void handle_hmac_provision(byte* payload, unsigned int len);
 void handle_ca_provision(byte* payload, unsigned int len);
 bool mqtt_publisher_edge_event(const edge_event_t* pkt);
+bool mqtt_forward_event(const edge_event_out* msg, uint8_t original_node_id);
 void mqtt_callback(char* topic, byte* payload, unsigned int length);
 void mqtt_loop();
