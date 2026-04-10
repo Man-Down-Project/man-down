@@ -147,11 +147,10 @@ pub async fn start_ble_server(
     };
 
     let _app_handle = adapter.serve_gatt_application(app).await?;
-    
 
     log::info!("BLE: provisioning service advertised");
     log::info!("BLE: provisioning service ready; HMAC payload prepared");
-// nya ändringar här! tanken är att det ska förhindra att enheten hänger sig vid omstart
+    // nya ändringar här! tanken är att det ska förhindra att enheten hänger sig vid omstart
     log::info!("BLE: server running (waiting for stop signal)");
 
     tokio::select! {
@@ -163,18 +162,13 @@ pub async fn start_ble_server(
         }
         _ = async {
             loop {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }
         } => {}
     }
 
-rfid_enabled.store(true, Ordering::Relaxed);
-log::info!("RFID: resumed after provisioning");
+    rfid_enabled.store(true, Ordering::Relaxed);
+    log::info!("RFID: resumed after provisioning");
 
-Ok(())
-    // let _ = stop.await;
-    // log::info!("BLE: stopping provisioning server");
-
-    // #[allow(unreachable_code)]
-    // Ok(())
+    Ok(())
 }

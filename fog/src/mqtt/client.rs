@@ -59,6 +59,8 @@ pub async fn start_mqtt(
         }
     }
 }
+
+#[allow(clippy::collapsible_if)]
 async fn run_session(
     cfg: &MqttConfig,
     tx: &Sender<Envelope>,
@@ -69,10 +71,7 @@ async fn run_session(
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
     let mut subscribed = false;
-    // for topic in &cfg.subscribe_topics {
-    //     client.subscribe(topic, QoS::AtLeastOnce).await?;
-    //     log::info!("MQTT: subscribed to {}", topic);
-    // }
+
     loop {
         tokio::select! {
             _ = shutdown_rx.changed() => {
