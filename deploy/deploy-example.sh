@@ -141,7 +141,7 @@ run_rsync "./passwordfile" "$PI_USER@$PI_IP:$DEST/"
 
 echo "⚙️ Running remote configuration..."
 run_ssh "
-    sudo apt update && sudo apt install -y mosquitto mosquitto-clients bluez sqlcipher libssl-dev ca-certificates
+    sudo apt update && sudo apt install -y mosquitto mosquitto-clients bluez sqlcipher libssl-dev libdbus-1-dev ca-certificates
     
     # Enable hardware and add user to groups
     sudo raspi-config nonint do_spi 0
@@ -185,10 +185,14 @@ DBUS\"
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf
 
     # Fix Bluetooth Service plugins
-    sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap,avrcp,a2dp,vcp,mcp,bap|' /lib/systemd/system/bluetooth.service
+    sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap|' /lib/systemd/system/bluetooth.service
     
     sudo mv $DEST/man_down.service /etc/systemd/system/
     sudo systemctl daemon-reload
+    sudo hciconfig hci0 up
+    sudo btmgmt power on
+    sudo btmgmt connectable on
+    sudo btmgmt discoverable on
     sudo systemctl restart bluetooth
     sudo systemctl restart mosquitto
     
