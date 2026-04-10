@@ -38,3 +38,4 @@ deploy/.env
 deploy/aclfile
 deploy/mosquitto-dev.conf
 deploy/passwordfile
+deploy/man_down.service
