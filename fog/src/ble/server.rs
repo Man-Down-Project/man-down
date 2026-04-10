@@ -68,8 +68,8 @@ pub async fn start_ble_server(
         local_name: Some("fog-node".to_string()),
         ..Default::default()
     };
-
-    let _adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
+    let adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
+    //let _adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
     log::info!("BLE: advertising started");
 
     let app = Application {
@@ -139,14 +139,29 @@ pub async fn start_ble_server(
         ..Default::default()
     };
 
-    let _app_handle = adapter.serve_gatt_application(app).await?;
+    //let _app_handle = adapter.serve_gatt_application(app).await?;
+    let app_handle = adapter.serve_gatt_application(app).await?;
 
     log::info!("BLE: provisioning service advertised");
     log::info!("BLE: provisioning service ready; HMAC payload prepared");
 
-    let _ = stop.await;
-    log::info!("BLE: stopping provisioning server");
+    log::info!("BLE: server running (waiting for stop signal)");
 
-    #[allow(unreachable_code)]
-    Ok(())
+    tokio::select! {
+        _ = stop => {
+            log::info!("BLE: stop signal received");
+    }
+        _ = async {
+            loop {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        }
+    } => {}
+}
+
+Ok(())
+    // let _ = stop.await;
+    // log::info!("BLE: stopping provisioning server");
+
+    // #[allow(unreachable_code)]
+    // Ok(())
 }
