@@ -36,7 +36,7 @@ void mqtt_init() {
 
     mqttClient.setCallback(mqtt_callback);
 
-    mqttClient.setBufferSize(1500);
+    mqttClient.setBufferSize(256);
 
     //choosing broker
     if (NODE_DEPTH == 1){
