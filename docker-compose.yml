@@ -4,9 +4,9 @@ services:
     image: eclipse-mosquitto:2
     restart: unless-stopped
     ports:
-      - "1883:1883"
+      - "1884:1883"
     volumes:
-      - ./fog/mosquitto-clean.conf:/mosquitto/config/mosquitto.conf
+      - ./fog/mosquitto-demo.conf:/mosquitto/config/mosquitto.conf
 
   fog:
     container_name: fog
@@ -29,5 +29,12 @@ services:
     container_name: edge-sim
     build: ./edge_sim
     restart: unless-stopped
+    depends_on:
+      - mqtt-broker
+
+  subscriber:
+    container_name: subscriber
+    build: ./edge_sim
+    command: ["python", "subscriber.py"]
     depends_on:
       - mqtt-broker

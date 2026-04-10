@@ -4,6 +4,6 @@ WORKDIR /app
 
 RUN pip install paho-mqtt
 
-COPY simulator.py .
+COPY . .
 
 CMD ["python", "simulator.py"]
