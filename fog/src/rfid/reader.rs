@@ -22,7 +22,15 @@ fn run_reader_loop(
 
     let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, Mode::Mode0)?;
     println!("RFID: SPI initialized");
+    use rppal::gpio::Gpio;
 
+    let gpio = Gpio::new()?;
+    let mut rst = gpio.get(25)?.into_output();
+
+    rst.set_low();
+    thread::sleep(Duration::from_millis(50));
+    rst.set_high();
+    thread::sleep(Duration::from_millis(50));
     let mut rfid = Mfrc522::new(&mut spi);
     println!("RFID: MFRC522 created");
 
@@ -52,7 +60,7 @@ fn run_reader_loop(
                     return Ok(());
                 }
             }
-            Err(_) => {
+            Err(err) => {
                 println!("RFID: read error: {:?}", err);
                 thread::sleep(Duration::from_millis(100));
             }
