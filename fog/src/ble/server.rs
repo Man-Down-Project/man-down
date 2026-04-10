@@ -68,8 +68,7 @@ pub async fn start_ble_server(
         local_name: Some("fog-node".to_string()),
         ..Default::default()
     };
-    let adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
-    //let _adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
+    let _adv_handle: AdvertisementHandle = adapter.advertise(adv).await?;
     log::info!("BLE: advertising started");
 
     let app = Application {
@@ -139,12 +138,12 @@ pub async fn start_ble_server(
         ..Default::default()
     };
 
-    //let _app_handle = adapter.serve_gatt_application(app).await?;
-    let app_handle = adapter.serve_gatt_application(app).await?;
+    let _app_handle = adapter.serve_gatt_application(app).await?;
+    
 
     log::info!("BLE: provisioning service advertised");
     log::info!("BLE: provisioning service ready; HMAC payload prepared");
-// nya ändringar här!
+// nya ändringar här! tanken är att det ska förhindra att enheten hänger sig vid omstart
     log::info!("BLE: server running (waiting for stop signal)");
 
     tokio::select! {
