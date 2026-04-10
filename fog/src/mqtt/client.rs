@@ -68,10 +68,11 @@ async fn run_session(
     let mqtt_options = build_mqtt_options(cfg)?;
     let (client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
 
-    for topic in &cfg.subscribe_topics {
-        client.subscribe(topic, QoS::AtLeastOnce).await?;
-        log::info!("MQTT: subscribed to {}", topic);
-    }
+    let mut subscribed = false;
+    // for topic in &cfg.subscribe_topics {
+    //     client.subscribe(topic, QoS::AtLeastOnce).await?;
+    //     log::info!("MQTT: subscribed to {}", topic);
+    // }
     loop {
         tokio::select! {
             _ = shutdown_rx.changed() => {
