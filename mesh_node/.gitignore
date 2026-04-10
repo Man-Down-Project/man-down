@@ -8,3 +8,4 @@ src/personal_setup.hpp
 data/
 src/file_handeling.cpp
 src/file_handeling.hpp
+man_down.service

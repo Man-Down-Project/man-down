@@ -2,15 +2,15 @@
 
 # Configuration for your own setup
 PI_USER="pi"        # <--change to device name
-PI_IP="192.168.0.29"          # <--add ip adress to device
-PI_PASS="pass"
-DB_ENCRYPTION_KEY="key"      # <--change to proper encryption key
+PI_IP="192.168.X.X"    # <--add ip adress to device
+PI_PASS="dev"
+DB_ENCRYPTION_KEY="key" # <--change to proper encryption key
 WIFI_SSID="wifi name"
 WIFI_PASS="wifi pass"
-MQTT_PORT="8883"  #the listener port for arduino 
+MQTT_PORT="8883"        # the listener port for arduino 
 #--------------------------------------------
 
-LOCAL_HEADER_DIR="../mesh_node/certs"           # <--change password to the device 
+LOCAL_HEADER_DIR="../mesh_node/certs"
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 
@@ -29,8 +29,10 @@ run_rsync() {
 }
 
 echo "🛠️  Step 0: Local Cross-Compilation..."
+chmod +x ./scripts/gen-certs.sh
 echo "🔐 Generating certificates locally..."
 ./scripts/gen-certs.sh "$PI_IP"
+
 cross build --release --target $TARGET
 
 if [ $? -ne 0 ]; then
@@ -120,7 +122,7 @@ cat > .env <<EOF
 MQTT_HOST=$PI_IP
 MQTT_PORT=8884
 MQTT_CLIENT_ID=fog-node-dev
-MQTT_TOPIC=mesh/node/#
+MQTT_TOPICS=mesh/node/#
 MQTT_USE_TLS=true
 MQTT_USERNAME=fog_user
 MQTT_PASSWORD=dev
@@ -173,12 +175,11 @@ DBUS\"
 
     cd $DEST && chmod +x $DEST/fog
     
-    # Clean old state to prevent MQTT 'already connected' errors
+    # Clean old state
     sudo systemctl stop mosquitto
     sudo rm -f /var/lib/mosquitto/mosquitto.db
     rm -f $DEST/data/fog.db $DEST/state/hmac.json
 
-    #sudo sh $SCRIPTS/gen-certs.sh
     sudo mkdir -p /etc/mosquitto/certs /var/lib/mosquitto
     
     if [ -d \"$DEST/certs\" ] && [ \"\$(ls -A $DEST/certs)\" ]; then
@@ -190,48 +191,39 @@ DBUS\"
     sudo chown -R mosquitto:mosquitto /etc/mosquitto/ /var/lib/mosquitto/
     sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf
     sudo chown -R $PI_USER:$PI_USER $DEST
-    # Fix Bluetooth Service plugins
-    sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap|' /lib/systemd/system/bluetooth.service
+
+    # Fix Bluetooth Service plugins (Aggressive exclusion to stop D-Bus errors)
+    sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap,avrcp,a2dp,vcp,mcp,bap|' /lib/systemd/system/bluetooth.service
     
     sudo mv $DEST/man_down.service /etc/systemd/system/
     sudo systemctl daemon-reload
-    sudo hciconfig hci0 up
-    sudo btmgmt power on
-    sudo btmgmt connectable on
-    sudo btmgmt pairable on
-    sudo btmgmt discoverable on
+    
+    # Modern Bluetooth Power-on
     sudo systemctl restart bluetooth
+    sleep 2
+    sudo bluetoothctl power on
+    sudo bluetoothctl discoverable on
+    sudo bluetoothctl pairable on
+    
     sudo systemctl restart mosquitto
     
+    # Set capabilities for hardware access
     sudo setcap 'cap_net_raw,cap_net_admin,cap_sys_rawio+eip' $DEST/fog
     sudo systemctl enable man_down
     sudo systemctl restart man_down
 "
 
-echo "✅ DONE!"
-
 echo "✅ DONE! Man Down is deployed and running."
 echo "🔄 Syncing generated C++ headers back to laptop..."
 
-# Define where the file was generated ON THE PI
 REMOTE_HEADER="/home/$PI_USER/mesh_node/certs/ca_cert.hpp"
-
-# Define where it should go ON YOUR PC
-
 mkdir -p "$LOCAL_HEADER_DIR"
-
-# PULL the file from the Pi to your PC
 sshpass -p "$PI_PASS" scp -o StrictHostKeyChecking=no "$PI_USER@$PI_IP:$REMOTE_HEADER" "$LOCAL_HEADER_DIR/ca_cert.hpp"
 
 echo "✅ Local C++ headers updated from Pi."
 
-# Define the path
 SETUP_OUTPUT="../mesh_node/src/personal_setup.hpp"
-
-echo "Generating personal setup header at $SETUP_OUTPUT"
-
 cat > "$SETUP_OUTPUT" <<EOF
-
 #pragma once
 //wifi config
 #define WIFI_SSID "$WIFI_SSID"
@@ -298,4 +290,3 @@ cat << "EOF"
           ▓▓  ▓▓    ▓▓  ▓▓        ▓▓        ▓▓              ▓▓        ▓▓
   ░░▓▓▓▓██      ▓▓▓▓▓▓    ▓▓▓▓██    ▓▓▓▓▒▒    ▓▓▓▓▓▓  ▓▓▓▓▓▓    ▓▓▓▓▓▓  
 EOF
-
