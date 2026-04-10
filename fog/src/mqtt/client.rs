@@ -90,6 +90,15 @@ async fn run_session(
 
             event = eventloop.poll() => {
                 let event = event?;
+                if let Event::Incoming(Packet::ConnAck(_)) = &event {
+                    if !subscribed {
+                        for topic in &cfg.subscribe_topics {
+                            client.subscribe(topic, QoS::AtLeastOnce).await?;
+                            log::info!("MQTT: subscribed to {}", topic);
+                        }
+                        subscribed = true;
+                    }
+                }
                 handle_event(event, tx, &cfg.mesh_node_id).await?;
             }
         }
