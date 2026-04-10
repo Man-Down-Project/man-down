@@ -1,3 +1,10 @@
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
 use bluer::Session;
 use bluer::adv::{Advertisement, AdvertisementHandle};
 use bluer::agent::Agent;
@@ -29,8 +36,11 @@ impl BleProvisioningData {
 pub async fn start_ble_server(
     data: BleProvisioningData,
     stop: tokio::sync::oneshot::Receiver<()>,
+    rfid_enabled: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("BLE: starting provisioning server");
+    rfid_enabled.store(false, Ordering::Relaxed);
+    log::info!("RFID: paused for provisioning");
 
     let session = Session::new().await?;
     let adapter = session.default_adapter().await?;
@@ -159,6 +169,8 @@ pub async fn start_ble_server(
         }
     } => {}
 }
+rfid_enabled.store(true, Ordering::Relaxed);
+log::info!("RFID: resumed after provisioning");
 
 Ok(())
     // let _ = stop.await;
