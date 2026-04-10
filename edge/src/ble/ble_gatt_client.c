@@ -186,15 +186,16 @@ static int gatt_chr_cb(uint16_t conn_handle,
                                         0xFFFF,
                                         gatt_dsc_cb,
                                         NULL);
-        }        
-                // ble_gattc_read(conn_handle,
-                //                provisioning_char_handle,
-                //                provisioning_read_cb,
-                //                NULL);
-            //     ESP_LOGI(TAG, "Reading provisioning characteristic...");
-            // } else {
-            //     ESP_LOGE(TAG, "Provisioning characteristic not found!");
-            // }
+                   
+                ble_gattc_read(conn_handle,
+                               provisioning_char_handle,
+                               provisioning_read_cb,
+                               NULL);
+                ESP_LOGI(TAG, "Reading provisioning characteristic...");
+            } else {
+                ESP_LOGE(TAG, "Provisioning characteristic not found!");
+            }
+            
         } else {
             if (ack_char_handle != 0) {
                 ble_gattc_disc_all_dscs(conn_handle,
@@ -202,6 +203,7 @@ static int gatt_chr_cb(uint16_t conn_handle,
                                         0xFFFF,
                                         gatt_dsc_cb,
                                         NULL);
+                
             } else {
                 ESP_LOGE(TAG, "ACK characteristic not found!");
             }
@@ -254,20 +256,7 @@ static int gatt_dsc_cb(uint16_t conn_handle,
         }
         return 0;
     }
-    if (error->status == BLE_HS_EDONE) {
-        ESP_LOGI(TAG, "Descriptor discovery complete");
-
-        if (provisioning_is_active() && provisioning_char_handle != 0) {
-            ESP_LOGI(TAG, "Now reading provisioning characteristic");
-
-            ble_gattc_read(conn_handle,
-                           provisioning_char_handle,
-                           provisioning_read_cb,
-                           NULL);
-        }
-        return 0;
-    }
-
+    
     return 0;
 }
 
