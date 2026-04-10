@@ -13,8 +13,6 @@ MQTT_PORT="8883"  #the listener port for arduino
 LOCAL_HEADER_DIR="../mesh_node/certs"           # <--change password to the device 
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
-# BINARY_PATH="../deploy/fog" # <--- använd den här med binary från github actions
-
 
 # CROSS COMPILATION CONFIG
 TARGET="armv7-unknown-linux-gnueabihf"
@@ -37,18 +35,17 @@ if [ $? -ne 0 ]; then
     echo "❌ Build failed! Aborting deployment."
     exit 1
 fi
+
 echo "🚀 Starting Deployment..."
 echo "📝 Generating local config files..."
 
 # 1. Generate Auth Files
 cat > aclfile <<EOF
-# ===== FOG =====
 user fog_user
 topic read mesh/node/#
 topic write mesh/provisioning/#
 topic write edge/provisioning/#
 
-# ===== MESH =====
 user mesh_user
 topic read mesh/provisioning/#
 topic read edge/provisioning/#
@@ -63,16 +60,18 @@ mosquitto_passwd -b "./passwordfile" mesh_user dev
 cat > man_down.service <<EOF
 [Unit]
 Description=Man Down Application
-After=network.target bluetooth.service
+After=network.target bluetooth.service mosquitto.service
+Requires=bluetooth.service
 
 [Service]
 Type=simple
 User=$PI_USER
-# Add these two lines to force the permissions into the running process
+Group=$PI_USER
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_RAWIO
 Capabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_RAWIO
 SupplementaryGroups=bluetooth spi gpio dialout lp plugdev
 WorkingDirectory=$DEST
+EnvironmentFile=$DEST/.env
 ExecStart=$DEST/fog
 Restart=always
 RestartSec=5
@@ -83,13 +82,11 @@ EOF
 
 # 3. Generate Mosquitto Config
 cat > mosquitto-dev.conf <<EOF
-# --- Persistence ---
 persistence true
 persistence_location /var/lib/mosquitto/
 persistence_file mosquitto.db
 autosave_interval 300
 
-# --- Listeners ---
 listener 8883
 protocol mqtt
 cafile /etc/mosquitto/certs/ca.crt
@@ -130,10 +127,11 @@ DB_KEY=$DB_ENCRYPTION_KEY
 DB_PATH=$DEST/data/fog.db
 EOF
 
+sed -i 's/\r$//' .env
+
 echo "📦 Transferring files..."
 run_ssh "mkdir -p $DEST/data $DEST/state $DEST/certs $SCRIPTS"
 run_rsync "./scripts/" "$PI_USER@$PI_IP:$SCRIPTS/"
-# run_rsync "$BINARY_PATH" "$PI_USER@$PI_IP:$DEST/" 
 run_rsync "$LOCAL_BINARY_PATH" "$PI_USER@$PI_IP:$DEST/$BINARY_NAME" 
 run_rsync ".env" "$PI_USER@$PI_IP:$DEST/"
 run_rsync "./man_down.service" "$PI_USER@$PI_IP:$DEST/"
@@ -143,16 +141,14 @@ run_rsync "./passwordfile" "$PI_USER@$PI_IP:$DEST/"
 
 echo "⚙️ Running remote configuration..."
 run_ssh "
-    # Dependency Check
-    echo 'Installing dependencies...' && \
-    sudo apt update && \
-    sudo apt install -y mosquitto mosquitto-clients bluez sqlcipher libssl-dev ca-certificates && \
+    sudo apt update && sudo apt install -y mosquitto mosquitto-clients bluez sqlcipher libssl-dev ca-certificates
     
-    # --- ADDED: Hardware & BT Setup ---
-    sudo raspi-config nonint do_spi 0 && \
-    sudo usermod -aG bluetooth,spi,gpio,lp,plugdev $PI_USER && \
-    
-    # --- ADDED: D-Bus Permission for Bluetooth ---
+    # Enable hardware and add user to groups
+    sudo raspi-config nonint do_spi 0
+    sudo usermod -aG bluetooth,spi,gpio,lp,plugdev $PI_USER
+    sudo rfkill unblock bluetooth
+
+    # Create DBus policy for Bluetooth
     sudo bash -c \"cat > /etc/dbus-1/system.d/bluetooth-$PI_USER.conf <<DBUS
 <!DOCTYPE busconfig PUBLIC '-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN'
  'http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd'>
@@ -166,63 +162,42 @@ run_ssh "
     <allow send_interface='org.freedesktop.DBus.Properties'/>
   </policy>
 </busconfig>
-DBUS\" && \
+DBUS\"
+    sudo systemctl reload dbus
 
-    # NEW: Reload DBUS to recognize the new policy immediately
-    sudo systemctl reload dbus && \
+    cd $DEST && chmod +x $DEST/fog
+    
+    # Clean old state to prevent MQTT 'already connected' errors
+    sudo systemctl stop mosquitto
+    sudo rm -f /var/lib/mosquitto/mosquitto.db
+    rm -f $DEST/data/fog.db $DEST/state/hmac.json
 
-    cd $DEST && \
-    chmod +x $DEST/fog && \
-
-    echo 'Resetting dev state on Pi...' && \
-    rm -f $DEST/data/fog.db && \
-    rm -f $DEST/state/hmac.json && \
-
-    sudo sh $SCRIPTS/gen-certs.sh && \
-
-    sudo mkdir -p /etc/mosquitto/certs && \
-    sudo mkdir -p /var/lib/mosquitto && \
+    sudo sh $SCRIPTS/gen-certs.sh
+    sudo mkdir -p /etc/mosquitto/certs /var/lib/mosquitto
     
     if [ -d \"$DEST/certs\" ] && [ \"\$(ls -A $DEST/certs)\" ]; then
         sudo cp $DEST/certs/* /etc/mosquitto/certs/
     fi
     
-    sudo cp $DEST/aclfile /etc/mosquitto/aclfile && \
-    sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile && \
-    
-    sudo chown -R mosquitto:mosquitto /etc/mosquitto/ && \
-    sudo chown -R mosquitto:mosquitto /var/lib/mosquitto/ && \
-    sudo chmod 700 /etc/mosquitto/certs && \
-    
-    sudo find /etc/mosquitto/certs/ -name '*.crt' -exec chmod 644 {} + && \
-    sudo find /etc/mosquitto/certs/ -name '*.key' -exec chmod 600 {} + && \
-    sudo chmod 600 /etc/mosquitto/passwordfile && \
-    
-    sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf && \
+    sudo cp $DEST/aclfile /etc/mosquitto/aclfile
+    sudo cp $DEST/passwordfile /etc/mosquitto/passwordfile
+    sudo chown -R mosquitto:mosquitto /etc/mosquitto/ /var/lib/mosquitto/
+    sudo mv $DEST/mosquitto-dev.conf /etc/mosquitto/mosquitto.conf
 
-    sudo chown -R $PI_USER:$PI_USER $DEST/certs && \
-    find $DEST/certs/ -name '*.crt' -exec chmod 644 {} + && \
-    find $DEST/certs/ -name '*.key' -exec chmod 600 {} + && \
+    # Fix Bluetooth Service plugins
+    sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap,avrcp,a2dp,vcp,mcp,bap|' /lib/systemd/system/bluetooth.service
     
-    sudo mv $DEST/man_down.service /etc/systemd/system/ && \
+    sudo mv $DEST/man_down.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl restart bluetooth
+    sudo systemctl restart mosquitto
     
-    # NEW: Disable the crashing audio plugins via the main config file as well
-    sudo sed -i 's/^#Disable=.*$/Disable=VCP,MCP,BAP,SAP/' /etc/bluetooth/main.conf || true && \
-
-    # Fix Bluetooth profiles in the service file
-    sudo sed -i 's|ExecStart=.*|ExecStart=/usr/libexec/bluetooth/bluetoothd --noplugin=sap,avrcp,a2dp,vcp,mcp,bap|' /lib/systemd/system/bluetooth.service && \
-    
-    sudo systemctl daemon-reload && \
-    sudo systemctl enable mosquitto && \
-    sudo systemctl restart mosquitto && \
-    sudo systemctl restart bluetooth && \
-
-    # Final capability check
-    sudo setcap 'cap_net_raw,cap_net_admin,cap_sys_rawio+eip' $DEST/fog && \
-    
-    sudo systemctl enable man_down && \
+    sudo setcap 'cap_net_raw,cap_net_admin,cap_sys_rawio+eip' $DEST/fog
+    sudo systemctl enable man_down
     sudo systemctl restart man_down
 "
+
+echo "✅ DONE!"
 
 echo "✅ DONE! Man Down is deployed and running."
 echo "🔄 Syncing generated C++ headers back to laptop..."
