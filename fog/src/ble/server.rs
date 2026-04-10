@@ -144,12 +144,15 @@ pub async fn start_ble_server(
 
     log::info!("BLE: provisioning service advertised");
     log::info!("BLE: provisioning service ready; HMAC payload prepared");
-
+// nya ändringar här!
     log::info!("BLE: server running (waiting for stop signal)");
 
     tokio::select! {
         _ = stop => {
             log::info!("BLE: stop signal received");
+    }
+    _ = tokio::signal::ctrl_c() => {
+        log::info!("BLE: received SIGINT/SIGTERM, shutting down");
     }
         _ = async {
             loop {
