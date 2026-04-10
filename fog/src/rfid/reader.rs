@@ -51,12 +51,12 @@ fn run_reader_loop(
             continue;
         }
 
-        match rfid.uid(Duration::from_millis(500)) {
+        match rfid.uid(Duration::from_millis(1000)) {
             Ok(uid) => {
                 let tag_id = format!("{:08X}", uid.to_u32());
 
                 if tag_id == last_tag && last_seen.elapsed() < Duration::from_secs(2) {
-                    thread::sleep(Duration::from_millis(150));
+                    thread::sleep(Duration::from_millis(200));
                     continue;
                 }
 
@@ -72,7 +72,7 @@ fn run_reader_loop(
             }
             Err(err) => {
                 println!("RFID error: {:?}", err);
-                thread::sleep(Duration::from_millis(200));
+                thread::sleep(Duration::from_millis(300));
             }
         }
     }
