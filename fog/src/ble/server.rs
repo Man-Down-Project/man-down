@@ -87,7 +87,7 @@ pub async fn start_ble_server(
                 uuid: char_uuid,
                 read: Some(CharacteristicRead {
                     read: true,
-                    encrypt_read: false,
+                    encrypt_read: true,
                     fun: Box::new({
                         let hmac_key = data.hmac_key.clone();
                         move |_req| {

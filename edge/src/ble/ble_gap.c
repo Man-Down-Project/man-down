@@ -90,10 +90,10 @@ static int gap_event_connect(struct ble_gap_event *event)
         provisioning_on_connected(event->connect.conn_handle);
 
         ESP_LOGI(TAG, "Starting secure pairing for provisioning");
-        // int rc = ble_gap_security_initiate(event->connect.conn_handle);
-        // if (rc != 0) {
-        //     ESP_LOGE(TAG, "Security initiation failed: %d", rc);
-        // }
+        int rc = ble_gap_security_initiate(event->connect.conn_handle);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "Security initiation failed: %d", rc);
+        }
     }        
     if (event->connect.status == 0) 
     {
