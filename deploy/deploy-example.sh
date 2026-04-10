@@ -76,6 +76,9 @@ EnvironmentFile=$DEST/.env
 ExecStart=$DEST/fog
 Restart=always
 RestartSec=5
+TimeoutStopSec=5
+KillSignal=SIGTERM
+KillMode=process
 
 [Install]
 WantedBy=multi-user.target 
