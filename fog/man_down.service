@@ -1,0 +1,24 @@
+[Unit]
+Description=Man Down Application
+After=network.target bluetooth.service mosquitto.service
+
+[Service]
+Type=simple
+<<<<<<< HEAD
+User=beebee
+WorkingDirectory=/home/beebee/man_down
+EnvironmentFile=/home/beebee/man_down/.env
+ExecStart=/home/beebee/man_down/fog
+=======
+User=pi
+WorkingDirectory=/home/pi/man_down
+EnvironmentFile=/home/pi/man_down/.env
+ExecStart=/home/pi/man_down/fog
+>>>>>>> 397ed2a (pi config)
+Restart=always
+RestartSec=5
+
+
+
+[Install]
+WantedBy=multi-user.target 
