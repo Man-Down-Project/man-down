@@ -73,7 +73,6 @@ fn run_reader_loop(
                 }
             }
             Err(err) => {
-                use rppal_mfrc522::Error;
 
                 match err {
                     Error::Timeout => {
