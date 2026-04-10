@@ -186,14 +186,15 @@ static int gatt_chr_cb(uint16_t conn_handle,
                                         0xFFFF,
                                         gatt_dsc_cb,
                                         NULL);
-                ble_gattc_read(conn_handle,
-                               provisioning_char_handle,
-                               provisioning_read_cb,
-                               NULL);
-                ESP_LOGI(TAG, "Reading provisioning characteristic...");
-            } else {
-                ESP_LOGE(TAG, "Provisioning characteristic not found!");
-            }
+        }        
+                // ble_gattc_read(conn_handle,
+                //                provisioning_char_handle,
+                //                provisioning_read_cb,
+                //                NULL);
+            //     ESP_LOGI(TAG, "Reading provisioning characteristic...");
+            // } else {
+            //     ESP_LOGE(TAG, "Provisioning characteristic not found!");
+            // }
         } else {
             if (ack_char_handle != 0) {
                 ble_gattc_disc_all_dscs(conn_handle,
@@ -233,29 +234,40 @@ static int gatt_dsc_cb(uint16_t conn_handle,
                        const struct ble_gatt_dsc *dsc,
                        void *arg)
 {
-    if (error->status != 0) {
+    if (error->status == 0) {
+        if (ble_uuid_u16(&dsc->uuid.u) == 0x2902) {
+
+            if (provisioning_is_active()) {
+                provisioning_cccd_handle = dsc->handle;
+                ESP_LOGI(TAG, "Provisioning CCCD found (ignored for now)");
+                // DO NOT enable notifications for provisioning
+            } else {
+                ack_cccd_handle = dsc->handle;
+                ESP_LOGI(TAG, "ACK CCCD found");
+
+                int n_idx = find_node_index(&current_peer_addr);
+                if (n_idx >= 0) {
+                    nodes[n_idx].cccd_handle = ack_cccd_handle;
+                }
+                gatt_enable_notifications(conn_handle, ack_cccd_handle);
+            }
+        }
         return 0;
     }
-    if (ble_uuid_u16(&dsc->uuid.u) == 0x2902) {
-            
-        if (provisioning_is_active()) {
-            
-            provisioning_cccd_handle = dsc->handle;
-            ESP_LOGI(TAG, "Provisioning CCCD found -> enabling notify");
-            gatt_enable_notifications(conn_handle, provisioning_cccd_handle);
-        } else {
+    if (error->status == BLE_HS_EDONE) {
+        ESP_LOGI(TAG, "Descriptor discovery complete");
 
-        
-            ack_cccd_handle = dsc->handle;
-            ESP_LOGI(TAG, "ACK CCCD found");
+        if (provisioning_is_active() && provisioning_char_handle != 0) {
+            ESP_LOGI(TAG, "Now reading provisioning characteristic");
 
-            int n_idx = find_node_index(&current_peer_addr);
-            if (n_idx >= 0) {
-                nodes[n_idx].cccd_handle = ack_cccd_handle;
-            }
-            gatt_enable_notifications(conn_handle, ack_cccd_handle);
-        }    
+            ble_gattc_read(conn_handle,
+                           provisioning_char_handle,
+                           provisioning_read_cb,
+                           NULL);
+        }
+        return 0;
     }
+
     return 0;
 }
 
