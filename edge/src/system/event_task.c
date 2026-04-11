@@ -83,6 +83,12 @@ static void handle_event(system_event_t *ev)
             nvs_flash_erase();
             esp_deep_sleep_start();
 
+        case EVENT_GAS_ALARM:
+            led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
+            led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
+            buzzer_play(BUZZER_GAS);
+            edge_trigger_event(EVENT_GASLARM, 95);
+
         default:
             break;
     }

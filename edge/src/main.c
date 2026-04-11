@@ -18,6 +18,7 @@
 #include "system/system_events.h"
 #include "system/event_task.h"
 #include "security/provisioning.h"
+#include "peripherals/sensors/mq_2.h"
 
 static const char *TAG = "MAIN";
 
@@ -34,5 +35,6 @@ void app_main(void)
     buzzer_init();
     led_init();
     onboard_led_init(); 
+    mq2_init();
 }
 
