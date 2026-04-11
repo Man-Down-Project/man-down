@@ -230,7 +230,7 @@ static void bma400_dump_interrupts(void); //<----- Only here for debug func
 static void bma400_task(void *arg)
 {
     uint16_t int_status;
-    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
+    //ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -256,7 +256,7 @@ static void bma400_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(10));
             bma400_get_interrupt_status(&int_status, &bma);
         }
-        esp_task_wdt_reset();
+        //esp_task_wdt_reset();
     }
 }
 
