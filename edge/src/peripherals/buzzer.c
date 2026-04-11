@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 
 #include "config/edge_config.h"
 #include "buzzer.h"
@@ -26,6 +27,7 @@ static void buzzer_off()
 
 static void buzzer_task(void *arg)
 {
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
         switch (current_pattern)
@@ -63,6 +65,7 @@ static void buzzer_task(void *arg)
                 vTaskDelay(pdMS_TO_TICKS(50));
 
         }
+        esp_task_wdt_reset();
     }
 }
 

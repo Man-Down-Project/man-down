@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_rom_sys.h"
+#include "esp_task_wdt.h"
 
 #include "driver/i2c.h"
 #include "driver/gpio.h"
@@ -229,6 +230,7 @@ static void bma400_dump_interrupts(void); //<----- Only here for debug func
 static void bma400_task(void *arg)
 {
     uint16_t int_status;
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
         ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -254,6 +256,7 @@ static void bma400_task(void *arg)
             vTaskDelay(pdMS_TO_TICKS(10));
             bma400_get_interrupt_status(&int_status, &bma);
         }
+        esp_task_wdt_reset();
     }
 }
 
@@ -314,7 +317,3 @@ static void bma400_dump_interrupts(void)
     if (status & BMA400_ASSERTED_STEP_INT)
         ESP_LOGI(TAG, "INT: STEP");
 }
-
-
-
-

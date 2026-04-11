@@ -4,6 +4,7 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 
 #include "system/event_task.h"
 
@@ -31,17 +32,45 @@ static void gas_task(void *arg)
     gas_event_t event;
     int last_state = -1;
 
-    while(1) {
-        if (xQueueReceive(gas_event_queue, &event, portMAX_DELAY)) {
-            ESP_LOGI(TAG, "Raw GPIO level: %d", event.level);
-            if (event.level == 1) {
-                ESP_LOGI(TAG, "Gas detected!");
-                system_event_post(EVENT_GAS_ALARM, 0);
-            } else {
-                ESP_LOGI(TAG, "Gas cleared");
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
+
+    while (1)
+    {
+        if (xQueueReceive(gas_event_queue, &event, pdMS_TO_TICKS(200)))
+        {
+            // 🔹 Debounce / stability check
+            int stable_count = 0;
+
+            for (int i = 0; i < 5; i++)
+            {
+                if (gpio_get_level(MQ2_GPIO))
+                    stable_count++;
+
+                vTaskDelay(pdMS_TO_TICKS(20));
             }
-            last_state = event.level;
+
+            int stable_level = (stable_count >= 4) ? 1 : 0;
+
+            ESP_LOGI(TAG, "Raw GPIO level: %d | Stable: %d", event.level, stable_level);
+
+            // 🔹 Only react on CHANGE (edge detection)
+            if (stable_level != last_state)
+            {
+                if (stable_level == 1)
+                {
+                    ESP_LOGI(TAG, "Gas detected!");
+                    system_event_post(EVENT_GAS_ALARM, 0);
+                }
+                else
+                {
+                    ESP_LOGI(TAG, "Gas cleared");
+                }
+
+                last_state = stable_level;
+            }
         }
+
+        esp_task_wdt_reset();
     }
 }
 

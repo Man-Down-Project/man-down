@@ -6,6 +6,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_sleep.h"
+#include "esp_task_wdt.h"
 
 #include "system_events.h"
 #include "peripherals/buzzer.h"
@@ -62,6 +63,7 @@ static void handle_event(system_event_t *ev)
             vTaskDelay(pdMS_TO_TICKS(500));
             nvs_flash_erase();
             esp_restart();
+            break;
         
         case EVENT_FALL_ALARM:
 
@@ -82,12 +84,19 @@ static void handle_event(system_event_t *ev)
             onboard_led_off();
             nvs_flash_erase();
             esp_deep_sleep_start();
+            break;
 
         case EVENT_GAS_ALARM:
-            led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
-            led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
+            led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_WHITE, LED_MODE_SOLID, LED_PRIO_HIGH);
             buzzer_play(BUZZER_GAS);
             edge_trigger_event(EVENT_GASLARM, 95);
+            break;
+
+        // case EVENT_DEBUG:
+        //     led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
+        //     led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
+
 
         default:
             break;
@@ -97,13 +106,14 @@ static void handle_event(system_event_t *ev)
 static void event_task(void *arg)
 {
     system_event_t ev;
-
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
-        if (xQueueReceive(event_queue, &ev, portMAX_DELAY))
+        if (xQueueReceive(event_queue, &ev, pdMS_TO_TICKS(1000)))
         {
             handle_event(&ev);
         }
+        esp_task_wdt_reset();
     }
 }
 

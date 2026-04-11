@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_task_wdt.h"
 
 #include "led_strip.h"  // New dependency
 #include "driver/gpio.h"
@@ -55,6 +56,7 @@ static void rgb_led_set(rgb_color_t color)
 
 static void onboard_led_task(void *arg)
 {
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
         // Snapshot the current mode/color to avoid holding the mux too long
@@ -92,7 +94,8 @@ static void onboard_led_task(void *arg)
                 rgb_led_set(RGB_OFF);
                 vTaskDelay(pdMS_TO_TICKS(500));
                 break;
-        }   
+        }
+        esp_task_wdt_reset();   
     }
 }
 

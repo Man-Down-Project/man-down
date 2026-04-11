@@ -25,7 +25,7 @@
 // Sparkfun BMA400 pin setup
 #define I2C_MASTER_SCL_IO   GPIO_NUM_12
 #define I2C_MASTER_SDA_IO   GPIO_NUM_22
-#define BMA400_INT_PIN      GPIO_NUM_10
+#define BMA400_INT_PIN      GPIO_NUM_25
 
 // BLE SETUP
 #define ROAM_THRESHOLD 16

@@ -2,6 +2,7 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_task_wdt.h"
 
 #include "driver/ledc.h"
 #include "driver/gpio.h"
@@ -86,6 +87,7 @@ static void rgb_led_set(rgb_color_t color)
 
 static void led_task(void *arg)
 {
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
         switch (led_mode)
@@ -116,7 +118,8 @@ static void led_task(void *arg)
             default:
                 rgb_led_set(RGB_OFF);
                 vTaskDelay(pdMS_TO_TICKS(100));
-        }   
+        }
+        esp_task_wdt_reset();   
     }
 }
 

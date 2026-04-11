@@ -3,6 +3,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 
 #include "button.h"
 #include "ble/ble.h"
@@ -95,6 +96,7 @@ static button_event_t button_update()
 
 static void button_task(void *arg)
 {
+    ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
         button_event_t state = button_update();
@@ -120,7 +122,9 @@ static void button_task(void *arg)
             system_event_post(EVENT_BUTTON_POWER, 0);
         }
         vTaskDelay(pdMS_TO_TICKS(10));
+        esp_task_wdt_reset();
     }
+    
 }
 
 void button_init()
