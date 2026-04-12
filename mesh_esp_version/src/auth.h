@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "../config/user_config.h"
+#include "auth_store.h"
+
+#define KEY_LEN 16
 typedef struct {
     uint8_t device_id;
     uint8_t seq;

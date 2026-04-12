@@ -8,8 +8,9 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "node.h"
-
-#define KEY_LEN 16
+#include "auth.h"
+#include "auth_store.h"
+#include "freertos/FreeRTOS.h"
 
 static const char *TAG = "[AUTH]";
 
@@ -38,6 +39,7 @@ void auth_store_key(const uint8_t *key, size_t len) {
     nvs_commit(handle);
     nvs_close(handle);
     ESP_LOGI(TAG, "Key stored in NVS");
+    vTaskDelay(pdMS_TO_TICKS(100));
 }
 
 /*
@@ -59,7 +61,13 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
     size_t key_len = KEY_LEN;
 
     // Load key or fallback
-    if (!auth_load_key(active_key, &key_len)) {
+    bool has_provisioned_key = load_hmac_key(active_key);
+
+    if (has_provisioned_key) 
+    {
+        ESP_LOGI(TAG, "Using provisioned key");
+    } else {
+        ESP_LOGW(TAG, "No provisioned key, using fallback");
         memcpy(active_key, shared_key, KEY_LEN);
     }
 
@@ -91,14 +99,14 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
 
     // HMAC
     const mbedtls_md_info_t *md =
-        mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
 
     mbedtls_md_context_t ctx;
     mbedtls_md_init(&ctx);
     mbedtls_md_setup(&ctx, md, 1);
 
     mbedtls_md_hmac_starts(&ctx, active_key, KEY_LEN);
-    mbedtls_md_hmac_update(&ctx, buffer, data_len);
+    mbedtls_md_hmac_update(&ctx, buffer, offsetof(edge_event_t, auth_tag));
     mbedtls_md_hmac_finish(&ctx, calculated_hash);
 
     mbedtls_md_free(&ctx);
@@ -117,3 +125,4 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
         return false;
     }
 }
+

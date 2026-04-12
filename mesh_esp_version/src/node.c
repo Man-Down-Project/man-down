@@ -83,7 +83,7 @@ static void node_task(void*arg)
                     break;
                 }
             }
-
+            vTaskDelay(pdMS_TO_TICKS(50));
             if (wifi_connected_globally && mqtt_client != NULL) 
             {
                 int msg_id = esp_mqtt_client_publish(mqtt_client,
@@ -103,7 +103,7 @@ void node_init(void)
 {
     xTaskCreate(node_task,
                 "node_task",
-                8192,
+                10240,
                 NULL,
                 5,
                 NULL);

@@ -6,6 +6,8 @@ set(app_sources
     "wifi.c" 
     "mqtt.c"
     "auth.c"
+    "auth_store.c"
+    "provision.c"
 )
 
 idf_component_register(SRCS ${app_sources}
