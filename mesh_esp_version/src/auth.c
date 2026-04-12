@@ -1,75 +1,34 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
+#include <stdio.h>
+
 #include "mbedtls/md.h"
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "node.h"
 
 #define KEY_LEN 16
-#define AUTH_TAG_LEN 16
 
-static bool key_present = false;
-static uint8_t stored_key[16];
 static const char *TAG = "[AUTH]";
-bool auth_load_key(uint8_t *out_key, size_t *out_len);
 
 uint8_t shared_key[KEY_LEN] = {
-    0x64,0xF9,0x0E,0xE7,
-    0x0E,0xB4,0x0E,0x78,
-    0x4F,0xFE,0xF2,0xEF,
-    0x96,0x01,0xB1,0x4F
+    0x64, 0xF9, 0x0E, 0xE7, 0x0E, 0xB4, 0x0E, 0x78,
+    0x4F, 0xFE, 0xF2, 0xEF, 0x96, 0x01, 0xB1, 0x4F
 };
-//64F90EE70EB40E784FFEF2EF9601B14F
-void generate_auth_tag(uint8_t *data, size_t data_len, uint8_t *auth_tag)
-{
-    uint8_t full_hash[32];   // SHA256 output
-    uint8_t secret_buf[KEY_LEN];
-    size_t key_len = KEY_LEN;
 
-    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-
-    mbedtls_md_context_t ctx;
-    mbedtls_md_init(&ctx);
-    mbedtls_md_setup(&ctx, md, 1);
-
-    if (!auth_load_key(shared_key, &key_len)) {
-        ESP_LOGW(TAG, "Using fallback shared_key");
-        memcpy(secret_buf, shared_key, KEY_LEN);
-    }
-    ESP_LOGI(TAG, "Using key:");
-    for (int i = 0; i < KEY_LEN; i++) {
-        printf("%02X ", secret_buf[i]);
-    }
-    mbedtls_md_hmac_starts(&ctx, shared_key, KEY_LEN);
-
-    // Hash the packet data
-    mbedtls_md_hmac_update(&ctx, data, data_len);
-
-    // Finish HMAC
-    mbedtls_md_hmac_finish(&ctx, full_hash);
-
-    // Store truncated tag
-    memcpy(auth_tag, full_hash, AUTH_TAG_LEN);
-
-    mbedtls_md_free(&ctx);
-}
-
-bool auth_key_exists(void)
-{
+bool auth_load_key(uint8_t *out_key, size_t *out_len) {
     nvs_handle_t handle;
-    size_t len = 0;
-    
     if (nvs_open("auth", NVS_READONLY, &handle) != ESP_OK) {
         return false;
     }
-    esp_err_t err = nvs_get_blob(handle, "hmac_secret", NULL, &len);
+    esp_err_t err = nvs_get_blob(handle, "hmac_secret", out_key, out_len);
     nvs_close(handle);
-
-    return (err == ESP_OK && len == KEY_LEN);
+    return (err == ESP_OK && *out_len == KEY_LEN);
 }
-void auth_store_key(const uint8_t *key, size_t len)
-{
+
+void auth_store_key(const uint8_t *key, size_t len) {
     nvs_handle_t handle;
     if (nvs_open("auth", NVS_READWRITE, &handle) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS");
@@ -78,42 +37,83 @@ void auth_store_key(const uint8_t *key, size_t len)
     nvs_set_blob(handle, "hmac_secret", key, len);
     nvs_commit(handle);
     nvs_close(handle);
-
     ESP_LOGI(TAG, "Key stored in NVS");
-
-    ESP_LOGI(TAG, "---- KEY DEBUG ----");
-    ESP_LOGI(TAG, "Provisioned key:");
-    for (int i = 0; i < len; i++) {
-        printf("%02X ", key[i]);
-    }
-    printf("\n");
-    ESP_LOGI(TAG, "Shared key :");
-     for (int i = 0; i < len; i++) {
-        printf("%02X ", shared_key[i]);
-    }
-    printf("\n");
-    ESP_LOGI(TAG, "-------------------");
 }
 
-bool auth_load_key(uint8_t *out_key, size_t *out_len)
-{
-    nvs_handle_t handle;
+/*
+ * ✅ Correct function
+ * - data: pointer to EXACT struct bytes
+ * - data_len: MUST be sizeof(edge_event_t)
+ */
+bool verify_edge_message(uint8_t *data, size_t data_len) {
 
-    if (nvs_open("auth", NVS_READONLY, &handle) != ESP_OK) {
-        ESP_LOGW(TAG, "NVS open failed, using fallback key");
-        return false;
-    }
-    size_t len = KEY_LEN;
-
-    esp_err_t err = nvs_get_blob(handle, "hmac_secret", out_key, &len);
-    nvs_close(handle);
-
-    if (err != ESP_OK || len != KEY_LEN) {
-        ESP_LOGW(TAG, "No valid key in NVS...");
+    if (!data || data_len != sizeof(edge_event_t)) {
+        ESP_LOGE(TAG, "Invalid input length: %d (expected %zu)",
+                 (int)data_len, sizeof(edge_event_t));
         return false;
     }
 
-    ESP_LOGI(TAG, "Loaded key from NVS");
-    *out_len = len;
-    return true;
+    uint8_t received_tag[AUTH_TAG_LEN];
+    uint8_t calculated_hash[32];
+    uint8_t active_key[KEY_LEN];
+    size_t key_len = KEY_LEN;
+
+    // Load key or fallback
+    if (!auth_load_key(active_key, &key_len)) {
+        memcpy(active_key, shared_key, KEY_LEN);
+    }
+
+    // Copy into fixed-size buffer (SAFE)
+    uint8_t buffer[sizeof(edge_event_t)];
+    memcpy(buffer, data, data_len);
+
+    // auth_tag is last field in struct
+    size_t tag_offset = data_len - AUTH_TAG_LEN;
+
+    // Extract received tag
+    memcpy(received_tag, buffer + tag_offset, AUTH_TAG_LEN);
+
+    // Debug prints
+    printf("[DEBUG] RX: ");
+    for (int i = 0; i < data_len; i++) printf("%02X", buffer[i]);
+    printf("\n");
+
+    printf("[DEBUG] TAG: ");
+    for (int i = 0; i < AUTH_TAG_LEN; i++) printf("%02X", received_tag[i]);
+    printf("\n");
+
+    printf("[DEBUG] KEY: ");
+    for (int i = 0; i < KEY_LEN; i++) printf("%02X", active_key[i]);
+    printf("\n");
+
+    // Zero tag before hashing
+    memset(buffer + tag_offset, 0, AUTH_TAG_LEN);
+
+    // HMAC
+    const mbedtls_md_info_t *md =
+        mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, md, 1);
+
+    mbedtls_md_hmac_starts(&ctx, active_key, KEY_LEN);
+    mbedtls_md_hmac_update(&ctx, buffer, data_len);
+    mbedtls_md_hmac_finish(&ctx, calculated_hash);
+
+    mbedtls_md_free(&ctx);
+
+    // Compare (only first AUTH_TAG_LEN bytes)
+    if (memcmp(calculated_hash, received_tag, AUTH_TAG_LEN) == 0) {
+        ESP_LOGI(TAG, "HMAC Verified");
+        return true;
+    } else {
+        ESP_LOGE(TAG, "HMAC Mismatch");
+
+        printf("[DEBUG] CALC: ");
+        for (int i = 0; i < AUTH_TAG_LEN; i++) printf("%02X", calculated_hash[i]);
+        printf("\n");
+
+        return false;
+    }
 }

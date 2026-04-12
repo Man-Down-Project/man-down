@@ -15,7 +15,7 @@
 static const char *TAG = "[BLE]";
 QueueHandle_t ble_queue;
 static uint16_t tx_handle;
-
+static uint16_t active_conn_handle = 0xFFFF;
 // Service: 12345678-1234-1234-1234-123456789abc
 static const ble_uuid128_t service_uuid =
     BLE_UUID128_INIT(
@@ -244,16 +244,19 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
         {
             if (event->connect.status == 0) {
                 ESP_LOGI(TAG, "Connection established");
+                active_conn_handle = event->connect.conn_handle;
             } else {
                 ESP_LOGE(TAG, "Connection failed; status=%d", event->connect.status);
                 ble_app_advertise();
             }
+
             break;
         }
         case BLE_GAP_EVENT_DISCONNECT:
         {
             ESP_LOGI(TAG, "Disconnected; reason=%d", event->disconnect.reason);
             ble_app_advertise();
+            active_conn_handle = 0xFFFF;
             break;
         }
         case BLE_GAP_EVENT_CONN_UPDATE:
@@ -282,4 +285,17 @@ void nvs_init(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+}
+
+void send_ble_nack(uint8_t seq)
+{
+    if (active_conn_handle == 0xFFFF || tx_handle == 0) return;
+
+    node_ack_t nack;
+    nack.seq = seq;
+    nack.status = CMD_AUTH_FAIL;
+
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(&nack, sizeof(nack));
+    ble_gatts_notify_custom(active_conn_handle, tx_handle, om);
+    ble_gap_terminate(active_conn_handle, BLE_ERR_REM_USER_CONN_TERM);
 }

@@ -10,6 +10,9 @@
 #include "ble.h"
 #include "wifi.h"
 #include "../config/user_config.h"
+#include "auth.h"
+
+
 
 extern esp_mqtt_client_handle_t mqtt_client;
 static const char *TAG = "[NODE]";
@@ -31,6 +34,13 @@ static void node_task(void*arg)
     {
         if (xQueueReceive(ble_queue, &incomming, portMAX_DELAY))
         {
+            
+            if (!verify_edge_message((uint8_t*)&incomming, sizeof(edge_event_t)))
+            {
+                ESP_LOGW(TAG, "Auth failed for device %d! Rejecting.", incomming.device_id);
+                send_ble_nack(incomming.seq);
+                continue;
+            }
             ESP_LOGI(TAG, "Processing event from device %d", incomming.device_id);
 
             outgoing.device_id = incomming.device_id;
