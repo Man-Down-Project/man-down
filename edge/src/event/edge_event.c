@@ -19,7 +19,7 @@ void edge_trigger_event(uint8_t event_type, uint8_t battery)
     memset(event.auth_tag, 0, AUTH_TAG_LEN);
 
     generate_auth_tag((uint8_t*)&event,
-                      sizeof(edge_event_t),
+                      sizeof(edge_event_t) - AUTH_TAG_LEN,
                       event.auth_tag
     );
     ble_send_event(&event);
