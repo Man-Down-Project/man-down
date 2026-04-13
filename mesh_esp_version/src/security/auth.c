@@ -7,9 +7,9 @@
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-#include "node.h"
+#include "events/node.h"
 #include "auth.h"
-#include "auth_store.h"
+#include "storage/auth_store.h"
 #include "freertos/FreeRTOS.h"
 
 static const char *TAG = "[AUTH]";

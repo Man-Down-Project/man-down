@@ -3,7 +3,7 @@
 #include "mqtt_client.h"
 #include "esp_sntp.h"
 
-#include "../config/user_config.h"
+#include "config/user_config.h"
 #include "mqtt.h"
 
 bool wifi_connected_globally = false;

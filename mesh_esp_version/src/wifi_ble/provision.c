@@ -4,8 +4,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "auth_store.h"
-#include "auth.h"
+#include "storage/auth_store.h"
+#include "security/auth.h"
 
 static const char *TAG = "[PROVISIONING]";
 

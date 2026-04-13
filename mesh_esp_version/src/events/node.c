@@ -7,12 +7,13 @@
 #include "mqtt_client.h"
 #include <time.h>
 
-#include "ble.h"
-#include "wifi.h"
-#include "../config/user_config.h"
-#include "auth.h"
+#include "wifi_ble/ble.h"
+#include "wifi_ble/wifi.h"
+#include "config/user_config.h"
+#include "security/auth.h"
+#include "event_task.h"
 
-
+edge_event_out outgoing;
 
 extern esp_mqtt_client_handle_t mqtt_client;
 static const char *TAG = "[NODE]";
@@ -22,7 +23,7 @@ extern QueueHandle_t ble_queue;
 static void node_task(void*arg)
 {
     edge_event_t incomming;
-    edge_event_out outgoing;
+    
 
     if (ble_queue == NULL)
     {
@@ -84,17 +85,8 @@ static void node_task(void*arg)
                 }
             }
             vTaskDelay(pdMS_TO_TICKS(50));
-            if (wifi_connected_globally && mqtt_client != NULL) 
-            {
-                int msg_id = esp_mqtt_client_publish(mqtt_client,
-                                                     PUB_TOPIC,
-                                                     (const char *)&outgoing,
-                                                     sizeof(edge_event_out),
-                                                     1, 0);
-                if (msg_id != -1) {
-                    ESP_LOGI(TAG, "Payload sent to Fog, ID: %d", msg_id);
-                }
-            }
+            system_event_post(EVENT_HEARTBEAT, 0);
+            
         }
     }
 }

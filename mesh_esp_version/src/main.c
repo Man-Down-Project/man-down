@@ -5,9 +5,11 @@
 
 #include "nimble/hci_common.h"
 
-#include "node.h"
-#include "ble.h"
-#include "wifi.h"
+#include "events/node.h"
+#include "wifi_ble/ble.h"
+#include "wifi_ble/wifi.h"
+#include "events/event_task.h"
+#include "peripherals/onboard_led.h"
 // #include "mqtt_client.h"
 // #include "boot.h"
 
@@ -24,5 +26,7 @@ void app_main()
     wifi_init_sta();
     ble_init();
     node_init();
+    event_task_init();
+    onboard_led_init();
    
 }

@@ -2,11 +2,11 @@
 #include "mqtt_client.h"
 
 #include "mqtt.h"
-#include "../config/user_config.h"
-#include "auth_store.h"
+#include "config/user_config.h"
+#include "storage/auth_store.h"
 #include "provision.h"
 #include "string.h"
-#include "auth.h"
+#include "security/auth.h"
 #include "esp_wifi.h"
 #include "esp_mac.h"
 

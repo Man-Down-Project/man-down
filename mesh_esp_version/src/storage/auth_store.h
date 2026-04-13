@@ -3,9 +3,9 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "auth.h"
-#include "node.h"
-#include "auth_common.h"
+#include "security/auth.h"
+#include "events/node.h"
+#include "security/auth_common.h"
 
 #define MAX_APPROVED_EDGE 10
 #define EMPTY_ID 0xFF

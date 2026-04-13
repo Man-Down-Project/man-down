@@ -9,8 +9,8 @@
 #include "nimble/hci_common.h"
 #include "nvs_flash.h"
 
-#include "ble.h"
-#include "node.h"
+#include "wifi_ble/ble.h"
+#include "events/node.h"
 
 static const char *TAG = "[BLE]";
 QueueHandle_t ble_queue;
