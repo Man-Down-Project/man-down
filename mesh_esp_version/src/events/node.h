@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define AUTH_TAG 8
-#define AUTH_TAG_LEN 8
+#define AUTH_TAG 16
+#define AUTH_TAG_LEN 16
 #define CMD_AUTH_FAIL 0xFD 
 #define CMD_DISCONNECT 0xFE
 
