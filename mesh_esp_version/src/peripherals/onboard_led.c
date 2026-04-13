@@ -4,12 +4,11 @@
 #include "esp_err.h"
 #include "esp_task_wdt.h"
 
-#include "led_strip.h"  // New dependency
+#include "led_strip.h" 
 #include "driver/gpio.h"
 
 #include "onboard_led.h"
 
-// The DevKit onboard LED is on GPIO 8
 #define LED_STRIP_GPIO 8
 #define LED_STRIP_NUM  1
 
@@ -21,13 +20,8 @@ static led_mode_t led_mode = LED_MODE_OFF;
 static portMUX_TYPE led_mux = portMUX_INITIALIZER_UNLOCKED;
 static led_priority_t current_priority = LED_PRIO_LOW;
 
-// Brightness control (0-255). 
-// WS2812 can be blindingly bright; 32 is a good "medium".
 static const uint8_t BRIGHTNESS = 32;
 
-/**
- * @brief Map your enum to actual RGB values and send to the strip
- */
 static void rgb_led_set(rgb_color_t color)
 {
     uint8_t r = 0, g = 0, b = 0;
@@ -57,7 +51,6 @@ static void onboard_led_task(void *arg)
     ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
     while(1)
     {
-        // Snapshot the current mode/color to avoid holding the mux too long
         taskENTER_CRITICAL(&led_mux);
         led_mode_t mode = led_mode;
         rgb_color_t color = led_color;
@@ -81,7 +74,6 @@ static void onboard_led_task(void *arg)
                 rgb_led_set(color);
                 vTaskDelay(pdMS_TO_TICKS(150));
                 rgb_led_set(RGB_OFF);
-                // Reset mode to off after one pulse
                 taskENTER_CRITICAL(&led_mux);
                 led_mode = LED_MODE_OFF;
                 taskEXIT_CRITICAL(&led_mux);

@@ -9,7 +9,6 @@
 
 static const char *TAG = "[PROVISIONING]";
 
-// 🔥 Convert hex string → bytes
 bool hexStringToByte(const char* str, uint8_t* out, size_t outLen)
 {
     size_t len = strlen(str);
@@ -23,15 +22,8 @@ bool hexStringToByte(const char* str, uint8_t* out, size_t outLen)
     return true;
 }
 
-// 🔥 MAIN FUNCTION (matches Arduino)
 void handle_provision(uint8_t *data, int len)
 {
-    
-    uint8_t existing_key[KEY_LEN];
-    if (load_hmac_key(existing_key)) {
-        ESP_LOGW(TAG, "Key already provisioned, skipping");
-        return;
-    }
     
     if (len != 40) {
         ESP_LOGE(TAG, "Invalid HMAC payload length: %d", len);
@@ -54,24 +46,28 @@ void handle_provision(uint8_t *data, int len)
     ESP_LOGI(TAG, "Key string: %s", keyStr);
     ESP_LOGI(TAG, "Timestamp string: %s", tsStr);
 
-    uint32_t timestamp = strtoul(tsStr, NULL, 10);
-
-    uint8_t key[16];
-
-    if (!hexStringToByte(keyStr, key, 16)) {
+    uint8_t incoming_key[16];
+    if (!hexStringToByte(keyStr, incoming_key, 16)) {
         ESP_LOGE(TAG, "Invalid key format");
         return;
     }
 
-    // 🔥 store key in NVS
-    if (!store_hmac_key(key)) {
-        ESP_LOGE(TAG, "Failed to store key");
+    uint8_t existing_key[16];
+    size_t existing_len = 16;
+    
+    bool has_key = auth_load_key(existing_key, &existing_len);
+
+    if (has_key && memcmp(incoming_key, existing_key, 16) == 0) {
+        ESP_LOGI(TAG, "Provisioning match: Key is already up to date. Skipping store/reboot.");
         return;
     }
 
-    ESP_LOGI(TAG, "HMAC key stored successfully");
+    ESP_LOGI(TAG, "Provisioning mismatch: Writing new key to NVS...");
+   
+    auth_store_key(incoming_key, 16);
 
-    // 🔥 reboot so new key is used
+    ESP_LOGI(TAG, "HMAC key stored successfully. Rebooting...");
+
     vTaskDelay(pdMS_TO_TICKS(1000));
     esp_restart();
 }

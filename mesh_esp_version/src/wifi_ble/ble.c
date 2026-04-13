@@ -43,7 +43,6 @@ static int ble_rx_cb(uint16_t conn_handle,
                      void *arg);
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
 
-// 1. Define the Characteristics separately
 static const struct ble_gatt_chr_def mesh_chrs[] = {
     {
         // RX Characteristic
@@ -65,7 +64,6 @@ static const struct ble_gatt_chr_def mesh_chrs[] = {
     {0} // Terminator for characteristics
 };
 
-// 2. Define the Service
 static const struct ble_gatt_svc_def gatt_svcs[] = {
     {
         .type = BLE_GATT_SVC_TYPE_PRIMARY,

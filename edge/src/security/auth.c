@@ -6,8 +6,7 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 
-#define KEY_LEN 16
-#define AUTH_TAG_LEN 16
+#include "config/edge_config.h"
 
 static bool key_present = false;
 static uint8_t stored_key[16];

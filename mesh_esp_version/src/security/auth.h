@@ -19,4 +19,5 @@ typedef struct {
 void auth_store_key(const uint8_t *key, size_t len);
 bool verify_edge_message(uint8_t *data, size_t data_len);
 void generate_auth_tag(uint8_t *data, size_t data_len, uint8_t *auth_tag);
+bool auth_load_key(uint8_t *out_key, size_t *out_len);
 #endif
