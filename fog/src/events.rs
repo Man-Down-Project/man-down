@@ -53,14 +53,65 @@ impl Envelope {
         if self.device_id.trim().is_empty() {
             return Err("device_id is empty".into());
         }
+        if !self.device_id.chars().all(|c| c.is_ascii_digit()) {
+            return Err(format!("device_id must be numeric: {}", self.device_id));
+        }
+
+        if self.device_id.len() > 3 {
+            return Err(format!("device_id too long: {}", self.device_id));
+        }
+
+        let allowed_devices = ["1", "2", "3"];
+        if !allowed_devices.contains(&self.device_id.as_str()) {
+            return Err(format!("device_id not allowed: {}", self.device_id));
+        }
         if self.mesh_node_id.trim().is_empty() {
             return Err("mesh_node_id is empty".into());
         }
+        if self.mesh_node_id.len() > 32 {
+            return Err(format!("mesh_node_id too long: {}", self.mesh_node_id));
+        }
+        if !self
+            .mesh_node_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        {
+            return Err(format!(
+                "mesh_node_id contains invalid characters: {}",
+                self.mesh_node_id
+            ));
+        }
+
         if self.seq == 0 {
             return Err("seq must be > 0".into());
         }
         if self.received_at > Utc::now() + ChronoDuration::minutes(5) {
             return Err("received_at too far in future".into());
+        }
+        if let Incident::BatteryLow { battery_level } = &self.incident {
+            if *battery_level > 100 {
+                return Err(format!("Invalid battery level: {}", battery_level));
+            }
+        }
+        if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &self.incident {
+            if worker_id.trim().is_empty() {
+                return Err("worker_id is empty".into());
+            }
+
+            if worker_id.len() > 32 {
+                return Err(format!("worker_id too long: {}", worker_id));
+            }
+        }
+        if let Incident::ManDown { zone_hint } = &self.incident {
+            if let Some(zone) = zone_hint {
+                if zone.trim().is_empty() {
+                    return Err("zone_hint is empty".into());
+                }
+
+                if zone.len() > 16 {
+                    return Err(format!("zone_hint too long: {}", zone));
+                }
+            }
         }
         Ok(())
     }
