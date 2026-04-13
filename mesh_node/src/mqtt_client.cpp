@@ -145,7 +145,7 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
     };
 
     compute_hmac16(
-        _eeprom.auth.shared_key,
+        authNode.getSharedKey(),
         KEY_LEN,
         data,
         sizeof(data),
