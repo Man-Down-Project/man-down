@@ -24,6 +24,7 @@ typedef struct __attribute__((packed)) {
     uint8_t battery;
     uint8_t seq;
     uint16_t timestamp;
+    uint8_t auth_tag[AUTH_TAG];
 }edge_event_out;
 
 typedef struct {

@@ -53,6 +53,12 @@ static void node_task(void*arg)
             time_t now;
             time(&now);
             outgoing.timestamp = (uint16_t)(now & 0xFFFF);
+            memset(outgoing.auth_tag, 0, AUTH_TAG_LEN);
+
+            generate_auth_tag((uint8_t*)&outgoing,
+                              offsetof(edge_event_out, auth_tag),
+                              outgoing.auth_tag
+            );
 
             switch(outgoing.event_type)
             {

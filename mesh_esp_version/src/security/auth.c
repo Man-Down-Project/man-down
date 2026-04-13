@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <string.h>
+#include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -11,6 +12,8 @@
 #include "auth.h"
 #include "storage/auth_store.h"
 #include "freertos/FreeRTOS.h"
+
+
 
 static const char *TAG = "[AUTH]";
 
@@ -58,10 +61,10 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
     uint8_t received_tag[AUTH_TAG_LEN];
     uint8_t calculated_hash[32];
     uint8_t active_key[KEY_LEN];
-    size_t key_len = KEY_LEN;
+    size_t key_len = KEY_LEN; 
 
     // Load key or fallback
-    bool has_provisioned_key = load_hmac_key(active_key);
+    bool has_provisioned_key = auth_load_key(active_key, &key_len);
 
     if (has_provisioned_key) 
     {
@@ -124,5 +127,39 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
 
         return false;
     }
+}
+
+void generate_auth_tag(uint8_t *data, size_t data_len, uint8_t *auth_tag)
+{
+    uint8_t calculated_hash[32];
+    uint8_t active_key[KEY_LEN];
+    size_t key_len = KEY_LEN;
+
+    const mbedtls_md_info_t *md = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+
+    mbedtls_md_context_t ctx;
+    mbedtls_md_init(&ctx);
+    mbedtls_md_setup(&ctx, md, 1);
+
+    if (!auth_load_key(active_key, &key_len)) {
+        ESP_LOGW(TAG, "Using fallback shared_key");
+        memcpy(active_key, shared_key, KEY_LEN);
+    }
+    ESP_LOGI(TAG, "Using key:");
+    for (int i = 0; i < KEY_LEN; i++) {
+        printf("%02X ", active_key[i]);
+    }
+    mbedtls_md_hmac_starts(&ctx, active_key, KEY_LEN);
+
+    // Hash the packet data
+    mbedtls_md_hmac_update(&ctx, data, data_len);
+
+    // Finish HMAC
+    mbedtls_md_hmac_finish(&ctx, calculated_hash);
+
+    // Store truncated tag
+    memcpy(auth_tag, calculated_hash, AUTH_TAG_LEN);
+
+    mbedtls_md_free(&ctx);
 }
 
