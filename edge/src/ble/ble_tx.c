@@ -176,8 +176,6 @@ void ble_tx_task(void *arg)
     }
 }
 
-
-
 void heartbeat_timer_cb(TimerHandle_t xTimer)
 {
     xTaskNotifyGive(ble_tx_task_handle);
