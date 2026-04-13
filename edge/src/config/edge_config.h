@@ -38,7 +38,7 @@
 #define NODE_BLACKLIST_TIME pdMS_TO_TICKS(60000) // <-1min blacklist
 
 //TEST PAYLOAD SETUP
-#define AUTH_TAG_LEN 8
+#define AUTH_TAG_LEN 16
 #define EVENT_HEARTBEAT 0x00
 #define EVENT_FALLARM   0x01
 #define EVENT_GASLARM   0x02
