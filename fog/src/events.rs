@@ -53,7 +53,7 @@ impl Envelope {
         if self.device_id.trim().is_empty() {
             return Err("device_id is empty".into());
         }
-        if self.device_id == "rfid" {
+        if self.device_id == "41803E06" {
             return Ok(());
         }
         if !self.device_id.chars().all(|c| c.is_ascii_digit()) {
