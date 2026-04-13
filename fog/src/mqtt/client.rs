@@ -1,5 +1,6 @@
-use crate::events::{EdgeEvent, Envelope};
+use crate::events::{EdgeEvent, Envelope, SignedEdgeEvent, verify_hmac};
 use crate::mqtt::{MqttConfig, OutgoingMessage};
+use crate::provisioning::state::load_hmac_state;
 use chrono::Utc;
 use rumqttc::{AsyncClient, Event, MqttOptions, Packet, QoS, Transport};
 use std::fs::OpenOptions;
@@ -150,7 +151,50 @@ async fn handle_event(
                 publish.payload.len()
             );
 
-            if let Some(edge) = EdgeEvent::from_bytes(&publish.payload) {
+            const EDGE_EVENT_LEN: usize = 7;
+            const HMAC_LEN: usize = 16;
+            const SIGNED_LEN: usize = EDGE_EVENT_LEN + HMAC_LEN;
+
+            if publish.payload.len() == SIGNED_LEN {
+                let event_bytes = &publish.payload[..EDGE_EVENT_LEN];
+                let hmac_bytes = &publish.payload[EDGE_EVENT_LEN..SIGNED_LEN];
+
+                let edge = match EdgeEvent::from_bytes(event_bytes) {
+                    Some(e) => e,
+                    None => {
+                        log::warn!("MQTT: failed to parse signed edge event");
+                        return Ok(());
+                    }
+                };
+                let hmac_state = match load_hmac_state() {
+                    Some(h) => h,
+                    None => {
+                        log::warn!("MQTT: no local HMAC state found, dropping packet");
+                        return Ok(());
+                    }
+                };
+
+                let key = match hex::decode(&hmac_state.key_hex) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        log::warn!("MQTT: invalid local HMAC key hex: {}", e);
+                        return Ok(());
+                    }
+                };
+
+                let signed = SignedEdgeEvent {
+                    event: edge,
+                    hmac_hex: hex::encode_upper(hmac_bytes),
+                };
+
+                log::info!("DEBUG event bytes: {}", hex::encode_upper(edge.to_bytes()));
+                log::info!("DEBUG incoming hmac: {}", hex::encode_upper(hmac_bytes));
+
+                if let Err(e) = verify_hmac(&signed, &key) {
+                    log::warn!("MQTT: HMAC verification failed, dropping packet: {}", e);
+                    return Ok(());
+                }
+
                 let received_at = Utc::now();
 
                 if edge.is_heartbeat() {

@@ -66,6 +66,12 @@ impl Envelope {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SignedEdgeEvent {
+    pub event: EdgeEvent,
+    pub hmac_hex: String,
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct EdgeEvent {
@@ -97,6 +103,19 @@ impl EdgeEvent {
             seq: b[4],
             time_stamp,
         })
+    }
+
+    pub fn to_bytes(&self) -> [u8; 7] {
+        let ts = self.time_stamp.to_le_bytes();
+        [
+            self.device_id,
+            self.event_type,
+            self.location,
+            self.battery,
+            self.seq,
+            ts[0],
+            ts[1],
+        ]
     }
 
     pub fn is_heartbeat(&self) -> bool {
@@ -155,5 +174,39 @@ impl EdgeEvent {
             received_at: Utc::now(),
             incident,
         }
+    }
+}
+
+pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    type HmacSha256 = Hmac<Sha256>;
+
+    let mut mac = HmacSha256::new_from_slice(key).map_err(|e| format!("invalid HMAC key: {e}"))?;
+
+    mac.update(&signed.event.to_bytes());
+
+    let expected = hex::decode(&signed.hmac_hex).map_err(|e| format!("invalid hmac hex: {e}"))?;
+
+    if expected.len() != 16 {
+        return Err(format!(
+            "expected 16-byte HMAC, got {} bytes",
+            expected.len()
+        ));
+    }
+
+    let full = mac.finalize().into_bytes();
+
+    log::info!("DEBUG computed hmac (full): {}", hex::encode_upper(&full));
+    log::info!(
+        "DEBUG computed hmac (16): {}",
+        hex::encode_upper(&full[..16])
+    );
+
+    if &full[..16] == expected.as_slice() {
+        Ok(())
+    } else {
+        Err("HMAC verification failed".to_string())
     }
 }
