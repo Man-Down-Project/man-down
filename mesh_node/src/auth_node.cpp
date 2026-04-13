@@ -2,6 +2,7 @@
 #include <Crypto.h>
 #include <SHA256.h>
 #include <stddef.h>
+##include "mbedtls/md.h"
 #include "auth_node.hpp"
 
 AuthNode authNode;
@@ -386,6 +387,18 @@ void AuthNode::AuthEnrollmentFromSerial(){
 void AuthNode::persistEEPROM() {
     EEPROM.put(0, _ram_auth);
 
+
+}
+void compute_hmac16(const uint8_t *key, size_t key_len, const uint8_t *data, size_t data_len, uint8_t* out16){
+    
+    SHA256 sha;
+    uint8_t full_hash[32];
+
+    sha.resetHMAC(key, key_len);
+    sha.update(data, data_len);
+    sha.finalizeHMAC(key, key_len, full_hash, 32);
+
+    memcpy(out16, full_hash, 16);
 }
 
 

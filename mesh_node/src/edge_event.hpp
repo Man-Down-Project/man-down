@@ -18,6 +18,7 @@ typedef struct __attribute__((packed)) {
     uint8_t battery;
     uint8_t seq;
     uint16_t timestamp;
+    uint8_t hmac[16];
 }edge_event_out;
 
 struct runtime_compare {

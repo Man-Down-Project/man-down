@@ -122,15 +122,36 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
     if (!mqttClient.connected())
         return false;
 
+
     edge_event_out msg = {
         pkt->device_id,
         pkt->event_type,
         pkt->location,
         pkt->battery,
         pkt->seq
+        
     };
+
     msg.timestamp = GetTimeStamp();
-    Serial.println(msg.timestamp);
+    
+    uint8_t data[7] = {
+        msg.device_id,
+        msg.event_type,
+        msg.location,
+        msg.battery,
+        msg.seq,
+        (uint8_t)(msg.timestamp >> 8),
+        (uint8_t)(msg.timestamp & 0XFF)
+    };
+
+    compute_hmac16(
+        _eeprom.auth.shared_key,
+        KEY_LEN,
+        data,
+        sizeof(data),
+        msg.hmac
+    );
+    
 
     return mqttClient.publish(
         topic,
