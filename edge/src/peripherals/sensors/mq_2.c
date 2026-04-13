@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/gpio.h"
+#include "driver/adc.h"
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 
@@ -10,6 +11,9 @@
 
 #define MQ2_GPIO GPIO_NUM_11
 
+#define GAS_THRESHOLD 2000
+#define GAS_HYSTERESIS 200
+static bool gas_active = false;
 static QueueHandle_t gas_event_queue = NULL;
 static const char *TAG = "[MQ2_GAS]";
 
@@ -24,7 +28,13 @@ static void IRAM_ATTR mq2_isr_handler(void *arg)
     gas_event_t event = {
         .level = level
     };
-    xQueueSendFromISR(gas_event_queue, &event, NULL);
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(gas_event_queue, &event, &xHigherPriorityTaskWoken);
+    if(xHigherPriorityTaskWoken)
+    {
+        portYIELD_FROM_ISR();
+    }
 }
 
 static void gas_task(void *arg)
@@ -32,34 +42,38 @@ static void gas_task(void *arg)
     gas_event_t event;
     int last_state = -1;
 
+    static uint32_t last_check_time = 0;
+    static uint32_t last_gas_event = 0;
+
     ESP_ERROR_CHECK(esp_task_wdt_add(NULL));
 
     while (1)
     {
         if (xQueueReceive(gas_event_queue, &event, pdMS_TO_TICKS(200)))
         {
-            // 🔹 Debounce / stability check
-            int stable_count = 0;
+            uint32_t now = xTaskGetTickCount();
 
-            for (int i = 0; i < 5; i++)
-            {
-                if (gpio_get_level(MQ2_GPIO))
-                    stable_count++;
-
-                vTaskDelay(pdMS_TO_TICKS(20));
+            // ⛔ Skip too frequent processing (debounce)
+            if (now - last_check_time < pdMS_TO_TICKS(200)) {
+                continue;
             }
+            last_check_time = now;
 
-            int stable_level = (stable_count >= 4) ? 1 : 0;
+            int stable_level = gpio_get_level(MQ2_GPIO);
 
             ESP_LOGI(TAG, "Raw GPIO level: %d | Stable: %d", event.level, stable_level);
 
-            // 🔹 Only react on CHANGE (edge detection)
+            // 🔹 Edge detection
             if (stable_level != last_state)
             {
                 if (stable_level == 1)
                 {
-                    ESP_LOGI(TAG, "Gas detected!");
-                    system_event_post(EVENT_GAS_ALARM, 0);
+                    if (now - last_gas_event > pdMS_TO_TICKS(10000))
+                    {
+                        ESP_LOGI(TAG, "Gas detected!");
+                        system_event_post(EVENT_GAS_ALARM, 0);
+                        last_gas_event = now;
+                    }
                 }
                 else
                 {
@@ -69,7 +83,6 @@ static void gas_task(void *arg)
                 last_state = stable_level;
             }
         }
-
         esp_task_wdt_reset();
     }
 }
@@ -94,7 +107,7 @@ void mq2_init(void)
                 "gas_task",
                  2048,
                  NULL,
-                 10,
+                 7,
                  NULL);
     
     ESP_LOGI(TAG, "MQ-2 initialized on GPIO %d", MQ2_GPIO);
