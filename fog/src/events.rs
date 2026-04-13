@@ -191,7 +191,7 @@ pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
 
     if expected.len() != 8 {
         return Err(format!(
-            "expected 16-byte HMAC, got {} bytes",
+            "expected 8-byte HMAC, got {} bytes",
             expected.len()
         ));
     }
@@ -199,10 +199,7 @@ pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
     let full = mac.finalize().into_bytes();
 
     log::info!("DEBUG computed hmac (full): {}", hex::encode_upper(&full));
-    log::info!(
-        "DEBUG computed hmac (16): {}",
-        hex::encode_upper(&full[..16])
-    );
+    log::info!("DEBUG computed hmac (8): {}", hex::encode_upper(&full[..8]));
 
     if &full[..8] == expected.as_slice() {
         Ok(())
