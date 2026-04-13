@@ -189,7 +189,7 @@ pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
 
     let expected = hex::decode(&signed.hmac_hex).map_err(|e| format!("invalid hmac hex: {e}"))?;
 
-    if expected.len() != 16 {
+    if expected.len() != 8 {
         return Err(format!(
             "expected 16-byte HMAC, got {} bytes",
             expected.len()
@@ -204,7 +204,7 @@ pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
         hex::encode_upper(&full[..16])
     );
 
-    if &full[..16] == expected.as_slice() {
+    if &full[..8] == expected.as_slice() {
         Ok(())
     } else {
         Err("HMAC verification failed".to_string())
