@@ -8,7 +8,7 @@
 
 void edge_trigger_event(uint8_t event_type, uint8_t battery)
 {
-    edge_event_t event;
+    edge_pkt_t event;
 
     event.device_id = DEVICE_ID;
     event.event_type = event_type;
