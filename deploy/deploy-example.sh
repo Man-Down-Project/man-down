@@ -70,6 +70,7 @@ ExecStartPre=/bin/sleep 2
 
 [Service]
 Type=simple
+Environment=RUST_LOG=debug
 User=$PI_USER
 Group=$PI_USER
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_SYS_RAWIO

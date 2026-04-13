@@ -30,6 +30,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             const char *prov_topic = "mesh/provisioning/hmac";
             esp_mqtt_client_subscribe(event->client, prov_topic, 1);
             ESP_LOGI(TAG, "Subscribed to %s", prov_topic);
+            mqtt_connected = true;
             break;
         }
         case MQTT_EVENT_DISCONNECTED:

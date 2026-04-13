@@ -124,6 +124,8 @@ static int gap_event_connect(struct ble_gap_event *event)
         
         ble_state = BLE_STATE_DISCOVERING;
         ESP_LOGI(TAG, "Encryption established");
+        current_node_id = get_node_id(&current_peer_addr);
+        ESP_LOGI(TAG, "Connected to node ID: %02X", current_node_id);
         
         if (node_index >= 0 &&
             nodes[node_index].gatt_cached &&
@@ -196,7 +198,7 @@ static int gap_event_disconnect(struct ble_gap_event *event)
     
     ble_state = BLE_STATE_SCANNING;
     start_scan();
-        
+    current_node_id = 0xFF;
     return 0;
 }
 
@@ -448,9 +450,10 @@ static int gap_event_enc_change(struct ble_gap_event *event)
     if (status == 0)
     {
         ESP_LOGI(TAG, "Encryption established!");
+        
         if (provisioning_is_active())
         {
-            ESP_LOGI(TAG, "Secure provisioning established");
+            ESP_LOGI(TAG, "Secure provisioning established");        
         }
         return 0;
     }

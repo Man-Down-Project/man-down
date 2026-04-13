@@ -49,16 +49,6 @@ static void handle_event(system_event_t *ev)
         {
             break;
         }
-        // case EVENT_GAS_ALARM:
-        //     led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_HIGH);
-        //     onboard_led_set(RGB_WHITE, LED_MODE_SOLID, LED_PRIO_HIGH);
-        //     buzzer_play(BUZZER_GAS);
-        //     edge_trigger_event(EVENT_GASLARM, 95);
-        //     break;
-
-        // case EVENT_DEBUG:
-        //     led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
-        //     led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
     }
 }
 
@@ -90,7 +80,7 @@ void event_task_init()
 
 static int send_event_over_mqtt()
 {
-    if (!wifi_connected_globally || mqtt_client != NULL) 
+    if (!wifi_connected_globally || !mqtt_connected) 
     {
         ESP_LOGW(TAG, "MQTT not ready");
         return -1;
@@ -104,5 +94,6 @@ static int send_event_over_mqtt()
         {
             ESP_LOGI(TAG, "Payload sent to Fog, ID: %d", msg_id);
         }
+        return msg_id;
     
 }

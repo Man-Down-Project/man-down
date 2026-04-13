@@ -52,7 +52,13 @@ static void node_task(void*arg)
 
             time_t now;
             time(&now);
-            outgoing.timestamp = (uint16_t)(now & 0xFFFF);
+            struct tm timeinfo;
+            localtime_r(&now, &timeinfo);
+
+            uint8_t hour = timeinfo.tm_hour;
+            uint8_t minute = timeinfo.tm_min;
+
+            outgoing.timestamp = (hour << 6) | minute;
             memset(outgoing.auth_tag, 0, AUTH_TAG_LEN);
 
             generate_auth_tag((uint8_t*)&outgoing,

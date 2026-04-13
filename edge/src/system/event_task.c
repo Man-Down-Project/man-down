@@ -87,8 +87,8 @@ static void handle_event(system_event_t *ev)
             break;
 
         case EVENT_GAS_ALARM:
-            led_set(RGB_WHITE, LED_MODE_BLINK, LED_PRIO_HIGH);
-            onboard_led_set(RGB_WHITE, LED_MODE_SOLID, LED_PRIO_HIGH);
+            led_set(RGB_YELLOW, LED_MODE_BLINK, LED_PRIO_HIGH);
+            onboard_led_set(RGB_YELLOW, LED_MODE_SOLID, LED_PRIO_HIGH);
             buzzer_play(BUZZER_GAS);
             edge_trigger_event(EVENT_GASLARM, 95);
             break;

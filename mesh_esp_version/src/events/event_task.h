@@ -12,4 +12,5 @@ void system_event_post(system_event_type_t type, uint32_t data);
 extern bool wifi_connected_globally;
 extern esp_mqtt_client_handle_t mqtt_client;
 extern edge_event_out outgoing;
+extern bool mqtt_connected;
 #endif

@@ -12,6 +12,8 @@ void ble_disconnect(void);
 void ble_gap_connect_to(const ble_addr_t *addr);
 
 
+extern int current_node_index;
+extern uint8_t current_node_id;
 
 #endif
 

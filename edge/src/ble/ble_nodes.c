@@ -3,7 +3,10 @@
 #include "ble/ble_nodes.h"
 #include "ble/ble_gap.h"
 
+int current_node_index = -1;
+uint8_t current_node_id = 0xFF;
 static const char *TAG = "BLE_NODE";
+
 
 node_info_t nodes[MAX_NODES];
 

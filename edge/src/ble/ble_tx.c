@@ -69,6 +69,7 @@ void ble_send_event(const edge_event_t *event)
 {
     ble_tx_msg_t msg;
     msg.event = *event;
+    msg.event.event_location = current_node_id;
 
     if (xQueueSend(ble_tx_queue, &msg, 0) != pdTRUE)
     {
@@ -132,6 +133,12 @@ void ble_tx_task(void *arg)
             !provisioning_is_active())
         {
             ESP_LOGI(TAG, "TX sending seq=%d (retry=%d)", tx_packet.seq, retry_count);
+            
+            tx_packet.event_location = current_node_id;
+            memset(tx_packet.auth_tag, 0, AUTH_TAG_LEN);
+            generate_auth_tag((uint8_t*)&tx_packet,
+                  sizeof(edge_event_t) - AUTH_TAG_LEN,
+                  tx_packet.auth_tag);
 
             gatt_busy = true;
             waiting_for_ack = true;
