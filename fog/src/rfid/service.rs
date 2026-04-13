@@ -16,7 +16,7 @@ pub fn scan_to_envelope(tag_id: String, scan: RfidScan, seq: u8) -> Envelope {
     };
 
     Envelope {
-        device_id: "rfid".to_string(),
+        device_id: tag_id,
         mesh_node_id: "fog-rfid".to_string(),
         seq,
         mesh_timestamp: 0,

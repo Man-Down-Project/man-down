@@ -53,15 +53,17 @@ impl Envelope {
         if self.device_id.trim().is_empty() {
             return Err("device_id is empty".into());
         }
-        if self.device_id != "rfid" &&
-            !self.device_id.chars().all(|c| c.is_ascii_digit()) {
+        if self.device_id == "rfid" {
+            return Ok(());
+        }
+        if !self.device_id.chars().all(|c| c.is_ascii_digit()) {
             return Err(format!("device_id must be numeric: {}", self.device_id));
         }
 
         if self.device_id.len() > 3 {
             return Err(format!("device_id too long: {}", self.device_id));
         }
-
+        
         let allowed_devices = ["1", "2", "3"];
         if !allowed_devices.contains(&self.device_id.as_str()) {
             return Err(format!("device_id not allowed: {}", self.device_id));
