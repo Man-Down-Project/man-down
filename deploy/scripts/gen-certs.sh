@@ -113,7 +113,7 @@ rm *.csr *.srl openssl_v3.conf
 echo "All certificates (Legacy & Modern) generated."
 
 SECURE_OUTPUT="../mesh_node/certs/device_config.hpp"
-SECURE_OUTPUT2="../mesh_esp_version/config/user_config.h"
+SECURE_OUTPUT2="../mesh_esp_version/src/config/user_config.h"
 
 echo "#pragma once" > "$SECURE_OUTPUT2"
 

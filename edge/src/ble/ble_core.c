@@ -57,7 +57,7 @@ static void ble_app_on_sync(void)
 {
     int rc;
 
-    rc = ble_hs_id_infer_auto(0, &own_addr_type);
+    rc = ble_hs_id_infer_auto(1, &own_addr_type);
     if (rc != 0) {
         ESP_LOGE(TAG, "Address infer failed");
         return;
@@ -112,8 +112,11 @@ void ble_init()
     ble_hs_cfg.sm_io_cap = BLE_HS_IO_NO_INPUT_OUTPUT;
 
 // Key distribution
-    ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC;
-    ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC;
+    ble_hs_cfg.sm_our_key_dist =
+    BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
+
+    ble_hs_cfg.sm_their_key_dist =
+    BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
     // =======================================
     //             START QUEUE + TASK
     // =======================================
