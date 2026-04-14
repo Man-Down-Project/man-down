@@ -64,7 +64,7 @@ void provisioning_handle_rx(const uint8_t *data, size_t len)
     ESP_LOGI(TAG, "Restarting device!");
     
     active = false;
-    ble_clear_bonds();
+    //ble_clear_bonds();
     ble_disconnect();
     vTaskDelay(pdMS_TO_TICKS(1000));
     esp_restart();

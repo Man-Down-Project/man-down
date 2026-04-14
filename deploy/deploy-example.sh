@@ -8,9 +8,12 @@ DB_ENCRYPTION_KEY="key" # <--change to proper encryption key
 WIFI_SSID="wifi name"
 WIFI_PASS="wifi pass"
 MQTT_PORT="8883"        # the listener port for arduino 
+DEVICE_ID="2"          # <--- for the esp mesh node
+MQTT_PASS="dev"
 #--------------------------------------------
 
 LOCAL_HEADER_DIR="../mesh_node/certs"
+LOCAL_HEADER_DIR_ESP="../mesh_esp_version/config"
 DEST="/home/$PI_USER/man_down"
 SCRIPTS="$DEST/scripts"
 
@@ -31,7 +34,9 @@ run_rsync() {
 echo "🛠️  Step 0: Local Cross-Compilation..."
 chmod +x ./scripts/gen-certs.sh
 echo "🔐 Generating certificates locally..."
-./scripts/gen-certs.sh "$PI_IP"
+mkdir -p "$LOCAL_HEADER_DIR"
+mkdir -p "$LOCAL_HEADER_DIR_ESP"
+./scripts/gen-certs.sh "$PI_IP" "$WIFI_SSID" "$WIFI_PASS" "$DEVICE_ID" "$MQTT_PASS"
 
 cross build --release --target $TARGET
 
@@ -54,11 +59,18 @@ user mesh_user
 topic read mesh/provisioning/#
 topic read edge/provisioning/#
 topic write mesh/node/#
+
+user mesh_node_$DEVICE_ID
+topic read mesh/provisioning/#
+topic read edge/provisioning/#
+topic write mesh/node/#
 EOF
 
 rm -f "./passwordfile"
-mosquitto_passwd -b -c "./passwordfile" fog_user dev
-mosquitto_passwd -b "./passwordfile" mesh_user dev
+mosquitto_passwd -b -c "./passwordfile" fog_user $MQTT_PASS
+mosquitto_passwd -b "./passwordfile" mesh_user $MQTT_PASS
+mosquitto_passwd -b "./passwordfile" mesh_node_$DEVICE_ID $MQTT_PASS
+
 
 # 2. Generate Systemd Service
 cat > man_down.service <<EOF
@@ -126,7 +138,7 @@ MQTT_CLIENT_ID=fog-node-dev
 MQTT_TOPICS=mesh/node/#
 MQTT_USE_TLS=true
 MQTT_USERNAME=fog_user
-MQTT_PASSWORD=dev
+MQTT_PASSWORD=$MQTT_PASS
 MQTT_CA_PATH=$DEST/certs/fog-ca.crt
 MQTT_CERT_PATH=$DEST/certs/rust-fog.crt
 MQTT_KEY_PATH=$DEST/certs/rust-fog.key
@@ -218,7 +230,7 @@ echo "✅ DONE! Man Down is deployed and running."
 echo "🔄 Syncing generated C++ headers back to laptop..."
 
 REMOTE_HEADER="/home/$PI_USER/mesh_node/certs/ca_cert.hpp"
-mkdir -p "$LOCAL_HEADER_DIR"
+
 sshpass -p "$PI_PASS" scp -o StrictHostKeyChecking=no "$PI_USER@$PI_IP:$REMOTE_HEADER" "$LOCAL_HEADER_DIR/ca_cert.hpp"
 
 echo "✅ Local C++ headers updated from Pi."
