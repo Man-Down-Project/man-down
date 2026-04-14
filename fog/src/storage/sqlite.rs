@@ -56,6 +56,38 @@ impl Storage {
 
         Ok(())
     }
+
+    pub fn insert_auth_event(&self, env: &Envelope) -> Result<()> {
+        let (worker_id, action) = match &env.incident {
+            Incident::Login { worker_id } => (worker_id, "login"),
+            Incident::Logout { worker_id } => (worker_id, "logout"),
+            _ => return Ok(()),
+        };
+
+        self.conn.execute(
+            "INSERT OR IGNORE INTO auth_events (
+            device_id,
+            worker_id,
+            action,
+            mesh_node_id,
+            seq,
+            mesh_timestamp,
+            received_at
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                &env.device_id,
+                worker_id,
+                action,
+                &env.mesh_node_id,
+                env.seq,
+                env.mesh_timestamp,
+                env.received_at.to_rfc3339(),
+            ],
+        )?;
+
+        Ok(())
+    }
 }
 
 fn apply_sqlcipher_key(conn: &Connection, key: &str) -> Result<()> {
@@ -91,6 +123,26 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_device_time
         ON events(device_id, received_at);
+
+        CREATE TABLE IF NOT EXISTS auth_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        device_id TEXT NOT NULL,
+        worker_id TEXT NOT NULL,
+        action TEXT NOT NULL,
+        mesh_node_id TEXT NOT NULL,
+        seq INTEGER NOT NULL,
+        mesh_timestamp INTEGER NOT NULL,
+        received_at TEXT NOT NULL,
+        UNIQUE(device_id, seq, action)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_auth_worker_time
+        ON auth_events(worker_id, received_at);
+
+        CREATE TABLE IF NOT EXISTS device_whitelist (
+        device_id TEXT PRIMARY KEY,
+        active INTEGER NOT NULL DEFAULT 1
+        );
         "#,
     )?;
 

@@ -21,7 +21,6 @@ use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
 use std::sync::Arc;
-// use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
 
@@ -157,6 +156,12 @@ async fn run_processor(
 
         if let Err(e) = storage.insert_event(&env) {
             log::error!("Failed to store event: {}", e);
+        }
+
+        if let Err(e) = storage.insert_auth_event(&env) {
+            log::error!("Failed to store auth event: {}", e);
+        } else {
+            log::info!("Stored auth event: {:?}", env.incident);
         }
 
         process_envelope(env, ble_running.clone(), rfid_enabled.clone()).await;
