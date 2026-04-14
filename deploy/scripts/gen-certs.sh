@@ -31,25 +31,20 @@ openssl req -x509 -new -nodes -days 365 -subj "/CN=Legacy-CA" -keyout ca.key -ou
 openssl req -newkey rsa:2048 -nodes -subj "/CN=$IP" -keyout server.key -out server.csr
 openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365
 
-# 4. Create the v3 Config (Needed for the ESP Mesh Certs)
-cat > openssl_v3.conf << EOF
+#Create the v3 Config (Needed for the ESP Mesh Certs)
+cat > openssl_v3.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
 prompt = no
 [req_distinguished_name]
 CN = Fog-CA
 [v3_ca]
-basicConstraints = critical, CA:TRUE
+basicConstraints = critical,CA:TRUE
 keyUsage = critical, digitalSignature, cRLSign, keyCertSign
-[v3_server]
+[v3_req]
 basicConstraints = CA:FALSE
-keyUsage = digitalSignature, keyEncipherment
-extendedKeyUsage = serverAuth
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = IP:$IP, IP:127.0.0.1, DNS:localhost
-[v3_client]
-basicConstraints = CA:FALSE
-keyUsage = digitalSignature
-extendedKeyUsage = clientAuth
 EOF
 
 # 5. Generate Modern CA
