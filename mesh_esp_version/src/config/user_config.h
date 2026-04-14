@@ -15,6 +15,3 @@
 #define MQTT_PASSWORD "dev"
 #define PUB_TOPIC "mesh/node/2/edge"
 
-extern const char ca_cert[];
-extern const char client_key[];
-extern const char client_cert[];
