@@ -88,6 +88,18 @@ impl Storage {
 
         Ok(())
     }
+
+    pub fn is_device_allowed(&self, device_id: &str) -> Result<bool> {
+        let mut stmt = self.conn.prepare(
+            "SELECT 1
+            FROM device_whitelist
+            WHERE device_id = ?1 AND active = 1
+            LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query(params![device_id])?;
+        Ok(rows.next()?.is_some())
+    }
 }
 
 fn apply_sqlcipher_key(conn: &Connection, key: &str) -> Result<()> {
@@ -109,7 +121,7 @@ fn configure_connection(conn: &Connection) -> Result<()> {
 fn initialize_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
-        CREATE TABLE IF NOT EXISTS events (
+            CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_id TEXT NOT NULL,
             mesh_node_id TEXT NOT NULL,
@@ -122,26 +134,26 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
         );
 
         CREATE INDEX IF NOT EXISTS idx_device_time
-        ON events(device_id, received_at);
+            ON events(device_id, received_at);
 
         CREATE TABLE IF NOT EXISTS auth_events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        device_id TEXT NOT NULL,
-        worker_id TEXT NOT NULL,
-        action TEXT NOT NULL,
-        mesh_node_id TEXT NOT NULL,
-        seq INTEGER NOT NULL,
-        mesh_timestamp INTEGER NOT NULL,
-        received_at TEXT NOT NULL,
-        UNIQUE(device_id, seq, action)
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id TEXT NOT NULL,
+            worker_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            mesh_node_id TEXT NOT NULL,
+            seq INTEGER NOT NULL,
+            mesh_timestamp INTEGER NOT NULL,
+            received_at TEXT NOT NULL,
+            UNIQUE(device_id, seq, action)
         );
 
         CREATE INDEX IF NOT EXISTS idx_auth_worker_time
-        ON auth_events(worker_id, received_at);
+            ON auth_events(worker_id, received_at);
 
         CREATE TABLE IF NOT EXISTS device_whitelist (
-        device_id TEXT PRIMARY KEY,
-        active INTEGER NOT NULL DEFAULT 1
+            device_id TEXT PRIMARY KEY,
+            active INTEGER NOT NULL DEFAULT 1
         );
         "#,
     )?;

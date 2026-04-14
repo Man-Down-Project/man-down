@@ -59,20 +59,18 @@ impl Envelope {
         if self.device_id.trim().is_empty() {
             return Err("device_id is empty".into());
         }
-        if self.device_id == "41803E06" {
-            return Ok(());
+        if !self
+            .device_id
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() || c == ':')
+        {
+            return Err(format!(
+                "device_id must look like a MAC address: {}",
+                self.device_id
+            ));
         }
-        if !self.device_id.chars().all(|c| c.is_ascii_digit()) {
-            return Err(format!("device_id must be numeric: {}", self.device_id));
-        }
-
-        if self.device_id.len() > 3 {
+        if self.device_id.len() > 17 {
             return Err(format!("device_id too long: {}", self.device_id));
-        }
-
-        let allowed_devices = ["1", "2", "3"];
-        if !allowed_devices.contains(&self.device_id.as_str()) {
-            return Err(format!("device_id not allowed: {}", self.device_id));
         }
         if self.mesh_node_id.trim().is_empty() {
             return Err("mesh_node_id is empty".into());
@@ -90,7 +88,6 @@ impl Envelope {
                 self.mesh_node_id
             ));
         }
-
         if self.seq == 0 {
             return Err("seq must be > 0".into());
         }

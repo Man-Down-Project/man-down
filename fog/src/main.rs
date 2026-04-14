@@ -193,10 +193,30 @@ async fn run_processor(
                     continue;
                 };
 
+                if Utc::now() - device.selected_at > chrono::Duration::seconds(10) {
+                    log::warn!("Selected device expired");
+                    *selected = None;
+                    continue;
+                }
                 env.device_id = device.device_id.clone();
                 *selected = None;
             }
             _ => {}
+        }
+
+        match storage.is_device_allowed(&env.device_id) {
+            Ok(true) => {}
+            Ok(false) => {
+                log::warn!(
+                    "Dropped event from non-whitelisted device: {}",
+                    env.device_id
+                );
+                continue;
+            }
+            Err(e) => {
+                log::error!("Failed to check device whitelist: {}", e);
+                continue;
+            }
         }
 
         if let Err(e) = storage.insert_event(&env) {
