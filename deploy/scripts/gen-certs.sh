@@ -2,11 +2,12 @@
 set -e
 
 # 1. Capture arguments with defaults to prevent empty subject lines
-IP=${1:? "Usage: $0 <PI_IP> <WIFI_SSID> <WIFI_PASS> <DEVICE_ID> <MQTT_PASS>"}
+IP=${1:? "Usage: $0 <PI_IP> <WIFI_SSID> <WIFI_PASS> <DEVICE_ID> <MQTT_PASS> <MQTT_PORT>"}
 WIFI_SSID=${2:-"Unknown_SSID"}
 WIFI_PASS=${3:-"no_password"}
 DEVICE_ID=${4:-"default_id"}
 MQTT_PASS=${5:-"dev"}
+MQTT_PORT=${6:-"port"}
 
 # 2. Get ABSOLUTE paths (Stops the "Arduino works but ESP fails" pathing issue)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -100,22 +101,16 @@ cat > "$ESP_H" <<EOF
 #define DEVICE_ID $DEVICE_ID
 
 // ===== MQTT =====
+#define BROKER_IP "mqtts://$IP:8883"
 #define MQTT_BROKER "$IP"
-#define MQTT_PORT 8884
+#define MQTT_PORT "$MQTT_PORT"
 #define MQTT_USERNAME "mesh_node_$DEVICE_ID"
 #define MQTT_PASSWORD "$MQTT_PASS"
+#define PUB_TOPIC "mesh/node/$DEVICE_ID/edge"
 
 // ===== TLS =====
-static const char client_cert[] = R"EOF(
-$MESH_CRT_CONTENT
-)EOF";
-
-static const char client_key[] = R"EOF(
-$MESH_KEY_CONTENT
-)EOF";
-
 static const char ca_cert[] = R"EOF(
-$FOG_CA_CONTENT
+$CA_CONTENT
 )EOF";
 EOF
 

@@ -1,17 +1,37 @@
 #pragma once
 
-#include <stddef.h>
-#include <string.h>
-#include <stdint.h>
 // ===== WiFi =====
 #define WIFI_SSID "Tele2_333f71_2.4Ghz"
 #define WIFI_PASS "qdzjtnwi"
 #define DEVICE_ID 2
 
 // ===== MQTT =====
-#define BROKER_IP "192.168.0.29"
-#define MQTT_PORT 8884
+#define BROKER_IP "mqtts://192.168.0.29:8883"
+#define MQTT_BROKER "192.168.0.29"
+#define MQTT_PORT "8883"
 #define MQTT_USERNAME "mesh_node_2"
 #define MQTT_PASSWORD "dev"
 #define PUB_TOPIC "mesh/node/2/edge"
 
+// ===== TLS =====
+static const char ca_cert[] = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIDCTCCAfGgAwIBAgIUeAAgea11GFShQlYeGHFfVMZX1OYwDQYJKoZIhvcNAQEL
+BQAwFDESMBAGA1UEAwwJTGVnYWN5LUNBMB4XDTI2MDQxNDE1MTgyOVoXDTI3MDQx
+NDE1MTgyOVowFDESMBAGA1UEAwwJTGVnYWN5LUNBMIIBIjANBgkqhkiG9w0BAQEF
+AAOCAQ8AMIIBCgKCAQEAznRvRmPCinefqQCsd3GRvPcXbFy3Ox7au0rxllEDiQ94
+n+xKaPTjWcMG68ujks4+OO4jpe9qJP322UcJDw6lZc4qmBaA3uGyHcN6adPX3sVK
+yZRox4exXs8muNok4aDwGkdG+0zhBF0YeSTKHPA45T0EOYDyJfCmukx0c27nWZ9J
+krMSFNjPN/eemClwMweSRVsgMCeIvEHn+Gb/10/E6zsIHG+oLCPJ2nDdawvFozuk
+lWfy533yKZnGVN74MVoMvlXBPAAG9LZZKxs/mzSFGW35N3xFud+mi/5ltvW8no9D
+eszLHEUmNe+rSbY/HRcu6d2qBKvnd9xvgbHrhNDFbQIDAQABo1MwUTAdBgNVHQ4E
+FgQUWctPoJAUdKzvczXlR8ZVLRv9y34wHwYDVR0jBBgwFoAUWctPoJAUdKzvczXl
+R8ZVLRv9y34wDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAeCPu
+d61uXrO6X4YgjU4qPR9mf1t+TQ3oCgm/2ycQqOyRMBnIi8k1EiEdsQs6dhBeFYg/
+iYrXNOe1vfd78oX+sSCGm0kF/jOtiCaGNm/v6wTFDoiR3mrv2WBRCQlm9J/dkLvJ
+FFKOZL8pkMLQ2AC5jCAMA3ZPnVDvkOV0aht8oD5dYAKP/CxK3+TXiGzNpDKICx/1
+tHW9MeUB2/VnBO6VKsjNfFgJlspfcLQUTFBicN6aFo63ptJPOejJ8NSGwrj1FNUO
+B29M3rHhNUyuq2tPlmTK5eWPJtAl3b4Y7JdexztmnvP0PdV/+1bVdFv2hygBBi62
+xATCl3okuYlEghGs6A==
+-----END CERTIFICATE-----
+)EOF";

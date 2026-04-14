@@ -10,7 +10,6 @@ set(app_sources
     "wifi_ble/provision.c"
     "peripherals/onboard_led.c"
     "events/event_task.c"
-    "config/user_config.c"
 )
 
 idf_component_register(SRCS ${app_sources}
