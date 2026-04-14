@@ -9,7 +9,7 @@
 #define DEVICE_ID 2
 
 // ===== MQTT =====
-#define MQTT_BROKER "mqtts://192.168.0.29:8884"
+#define BROKER_IP "192.168.0.29"
 #define MQTT_PORT 8884
 #define MQTT_USERNAME "mesh_node_2"
 #define MQTT_PASSWORD "dev"
