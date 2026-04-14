@@ -100,6 +100,37 @@ impl Storage {
         let mut rows = stmt.query(params![device_id])?;
         Ok(rows.next()?.is_some())
     }
+
+    pub fn is_worker_allowed(&self, worker_id: &str) -> Result<bool> {
+        let mut stmt = self.conn.prepare(
+            "SELECT 1
+         FROM worker_whitelist
+         WHERE worker_id = ?1 AND active = 1
+         LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query(params![worker_id])?;
+        Ok(rows.next()?.is_some())
+    }
+
+    pub fn add_device_to_whitelist(&self, device_id: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO device_whitelist (device_id, active)
+             VALUES (?1, 1)",
+            params![device_id],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn add_worker_to_whitelist(&self, worker_id: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO worker_whitelist (worker_id, active)
+         VALUES (?1, 1)",
+            params![worker_id],
+        )?;
+        Ok(())
+    }
 }
 
 fn apply_sqlcipher_key(conn: &Connection, key: &str) -> Result<()> {
@@ -153,6 +184,11 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
 
         CREATE TABLE IF NOT EXISTS device_whitelist (
             device_id TEXT PRIMARY KEY,
+            active INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS worker_whitelist (
+            worker_id TEXT PRIMARY KEY,
             active INTEGER NOT NULL DEFAULT 1
         );
         "#,

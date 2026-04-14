@@ -4,6 +4,7 @@ mod events;
 mod mqtt;
 mod provisioning;
 mod rfid;
+mod shared_state;
 mod storage;
 
 use crate::app_config::AppConfig;
@@ -17,6 +18,7 @@ use crate::provisioning::scheduler::run_hmac_rotation_scheduler;
 use crate::provisioning::state::{hmac_needs_rotation, load_hmac_state, save_hmac_state};
 use crate::rfid::reader::start_rfid_reader_thread;
 use crate::rfid::service::run_rfid_service;
+use crate::shared_state::PendingDeviceSelection;
 use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
@@ -24,19 +26,13 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
 
-#[derive(Debug, Clone)]
-struct PendingDeviceSelection {
-    device_id: String,
-    selected_at: chrono::DateTime<Utc>,
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
     env_logger::init();
 
     let config = AppConfig::from_env()?;
-    let storage = Storage::new(&config.db_path, &config.db_key)?;
+    let storage = Arc::new(Storage::new(&config.db_path, &config.db_key)?);
 
     let hmac = if let Some(existing) = load_hmac_state() {
         if hmac_needs_rotation(&existing) {
@@ -113,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let processor = run_processor(
         rx,
-        storage,
+        storage.clone(),
         ble_running.clone(),
         rfid_enabled.clone(),
         selected_device.clone(),
@@ -156,7 +152,7 @@ async fn publish_initial_provisioning(
 
 async fn run_processor(
     mut rx: mpsc::Receiver<Envelope>,
-    storage: Storage,
+    storage: Arc<Storage>,
     ble_running: Arc<Mutex<bool>>,
     rfid_enabled: Arc<AtomicBool>,
     selected_device: Arc<Mutex<Option<PendingDeviceSelection>>>,
@@ -165,23 +161,6 @@ async fn run_processor(
         if let Err(e) = env.validate_basic() {
             log::warn!("Dropped invalid envelope: {}", e);
             continue;
-        }
-        // TEMP: treat non-login/logout as edge selection
-        match &env.incident {
-            Incident::Login { .. } | Incident::Logout { .. } => {
-                // handled below
-            }
-            _ => {
-                let mut selected = selected_device.lock().await;
-
-                *selected = Some(PendingDeviceSelection {
-                    device_id: env.device_id.clone(),
-                    selected_at: Utc::now(),
-                });
-
-                log::info!("Selected device: {}", env.device_id);
-                continue;
-            }
         }
 
         match &env.incident {
@@ -219,6 +198,20 @@ async fn run_processor(
             }
         }
 
+        if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &env.incident {
+            match storage.is_worker_allowed(worker_id) {
+                Ok(true) => {}
+                Ok(false) => {
+                    log::warn!("Dropped event from non-whitelisted worker: {}", worker_id);
+                    continue;
+                }
+                Err(e) => {
+                    log::error!("Worker whitelist check failed: {}", e);
+                    continue;
+                }
+            }
+        }
+
         if let Err(e) = storage.insert_event(&env) {
             log::error!("Failed to store event: {}", e);
         }
@@ -229,7 +222,13 @@ async fn run_processor(
             log::info!("Stored auth event: {:?}", env.incident);
         }
 
-        process_envelope(env, ble_running.clone(), rfid_enabled.clone()).await;
+        process_envelope(
+            env,
+            ble_running.clone(),
+            rfid_enabled.clone(),
+            selected_device.clone(),
+        )
+        .await;
     }
 
     log::info!("Processor: channel closed, exiting");
@@ -239,6 +238,7 @@ async fn process_envelope(
     env: Envelope,
     ble_running: Arc<Mutex<bool>>,
     rfid_enabled: Arc<AtomicBool>,
+    selected_device: Arc<Mutex<Option<PendingDeviceSelection>>>,
 ) {
     let _ = &rfid_enabled;
     log::info!(
@@ -286,10 +286,15 @@ async fn process_envelope(
 
             let (tx, rx) = tokio::sync::oneshot::channel();
             let rfid_enabled_for_ble = rfid_enabled.clone();
+            let selected_device_for_ble = selected_device.clone();
+
             tokio::spawn(async move {
                 log::info!("BLE: starting provisioning (10 secound window)");
 
-                if let Err(e) = start_ble_server(ble_data, rx, rfid_enabled_for_ble).await {
+                if let Err(e) =
+                    start_ble_server(ble_data, rx, rfid_enabled_for_ble, selected_device_for_ble)
+                        .await
+                {
                     log::error!("BLE error: {}", e);
                 }
 
