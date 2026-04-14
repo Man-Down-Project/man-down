@@ -27,40 +27,47 @@ cd "$CERTS_DIR"
 
 # 3. Generate Basic/Legacy Certs (The ones you said work)
 echo "Generating CA and Server certs..."
-openssl req -x509 -new -nodes -days 365 -subj "/CN=Legacy-CA" -keyout ca.key -out ca.crt
-openssl req -newkey rsa:2048 -nodes -subj "/CN=$IP" -keyout server.key -out server.csr
-openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365
-
-#Create the v3 Config (Needed for the ESP Mesh Certs)
 cat > openssl_v3.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
-prompt = no
+req_extensions = v3_req
+x509_extensions = v3_ca
+
 [req_distinguished_name]
-CN = Fog-CA
-[v3_ca]
-basicConstraints = critical,CA:TRUE
-keyUsage = critical, digitalSignature, cRLSign, keyCertSign
+commonName = Common Name
+
 [v3_req]
 basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-subjectAltName = IP:$IP, IP:127.0.0.1, DNS:localhost
+subjectAltName = @alt_names
+
+[v3_ca]
+basicConstraints = CA:TRUE
+keyUsage = digitalSignature, cRLSign, keyCertSign
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = $IP
+IP.2 = 127.0.0.1
+DNS.1 = localhost
 EOF
 
-# 5. Generate Modern CA
+echo "1. Generating Root CA..."
 openssl genrsa -out fog-ca.key 2048
-openssl req -x509 -new -nodes -key fog-ca.key -sha256 -days 365 -out fog-ca.crt -config openssl_v3.conf -extensions v3_ca -subj "/CN=Fog-CA"
+openssl req -x509 -new -nodes -key fog-ca.key -sha256 -days $DAYS \
+    -subj "/CN=$CA_CN" -out fog-ca.crt -config openssl_v3.conf -extensions v3_ca
 
-# 6. Generate the Mesh Client Cert (The one that was failing)
-echo "Generating Mesh Client Cert for ID: $DEVICE_ID"
-openssl genrsa -out mesh-client.key 2048
-openssl req -new -key mesh-client.key -subj "/CN=mesh-node-$DEVICE_ID" -out mesh-client.csr
-openssl x509 -req -in mesh-client.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial -out mesh-client.crt -days 365 -sha256 -extfile openssl_v3.conf -extensions v3_client
+echo "2. Generating Server Certificate (for Mosquitto)..."
+openssl genrsa -out fog-server.key 2048
+openssl req -new -key fog-server.key -subj "/CN=$SERVER_CN" -out fog-server.csr
+openssl x509 -req -in fog-server.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
+    -out fog-server.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_req
 
-# 7. Generate Rust Fog Cert
+echo "3. Generating Client Certificate (for Rust/Arduino)..."
 openssl genrsa -out rust-fog.key 2048
-openssl req -new -key rust-fog.key -subj "/CN=fog-node-dev" -out rust-fog.csr
-openssl x509 -req -in rust-fog.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial -out rust-fog.crt -days 365 -sha256 -extfile openssl_v3.conf -extensions v3_client
+openssl req -new -key rust-fog.key -subj "/CN=$CLIENT_CN" -out rust-fog.csr
+openssl x509 -req -in rust-fog.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
+    -out rust-fog.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_req
 
 # 8. PRE-WRITE CHECK: Verify files exist
 if [ ! -f "mesh-client.crt" ]; then
