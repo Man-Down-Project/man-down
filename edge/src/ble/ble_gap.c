@@ -85,18 +85,24 @@ static int gap_event_connect(struct ble_gap_event *event)
 {
     struct ble_gap_conn_desc desc;
     notifications_ready = false;
-
-    if (provisioning_is_active()) {
-        provisioning_on_connected(event->connect.conn_handle);
-
-        ESP_LOGI(TAG, "Starting secure pairing for provisioning");
-        int rc = ble_gap_security_initiate(event->connect.conn_handle);
-        if (rc != 0) {
-            ESP_LOGE(TAG, "Security initiation failed: %d", rc);
-        }
-    }        
+    int rc;
+            
     if (event->connect.status == 0) 
     {
+        rc = ble_gap_conn_find(event->connect.conn_handle, &desc);
+        if (rc != 0) {
+            ESP_LOGE(TAG, "Failed to find connection description: %d", rc);
+        }
+        if (provisioning_is_active() && !desc.sec_state.bonded) 
+        {
+            provisioning_on_connected(event->connect.conn_handle);
+            ESP_LOGI(TAG, "Starting secure pairing for provisioning");
+            int rc = ble_gap_security_initiate(event->connect.conn_handle);
+            if (rc != 0) {
+                ESP_LOGE(TAG, "Security initiation failed: %d", rc);
+            }
+        }
+        
         ble_state = BLE_STATE_CONNECTED;
         pairing_failed = false;
         ESP_LOGI(TAG, "Connected");
@@ -440,7 +446,6 @@ static int gap_event_disc_complete(struct ble_gap_event *event)
 
 static int gap_event_enc_change(struct ble_gap_event *event)
 {
-    
     int status = event->enc_change.status;
     ESP_LOGI(TAG, "Encryption status=%d", status);
     gatt_client_reset();
@@ -457,6 +462,14 @@ static int gap_event_enc_change(struct ble_gap_event *event)
         }
         return 0;
     }
+    if (status == 5 || status == 256) {
+        struct ble_gap_conn_desc desc;
+        if (ble_gap_conn_find(event->enc_change.conn_handle, &desc) == 0) {
+            ESP_LOGW(TAG, "Bond mismatch/Auth failure. Deleting local bond for peer.");
+            ble_gap_unpair(&desc.peer_id_addr);
+        }
+    }
+   
     ESP_LOGE(TAG, "Encryption failed, status=%d", status);
 
     if (provisioning_is_active())
@@ -493,7 +506,7 @@ static int gap_event_enc_change(struct ble_gap_event *event)
         ESP_LOGW(TAG, "Encryption failed, (Connected to mesh node)");
     }
     return 0;
-} 
+}
 
 static int gap_event_notify(struct ble_gap_event *event)
 {

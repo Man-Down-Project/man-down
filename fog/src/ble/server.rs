@@ -48,6 +48,30 @@ pub async fn start_ble_server(
     adapter.set_pairable(true).await?;
     adapter.set_discoverable_timeout(0).await?;
 
+    // this is supposed to remove the bond data after disconnect
+    let adapter_cleanup = adapter.clone();
+    tokio::spawn(async move {
+        log::info!("BLE: Bond cleanup monitor started");
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            if let Ok(addrs) = adapter_cleanup.device_addresses().await {
+                for addr in addrs {
+                    if let Ok(device) = adapter_cleanup.device(addr) {
+                        let connected = device.is_connected().await.unwrap_or(false);
+                        let paired = device.is_paired().await.unwrap_or(false);
+
+                        // If the device is still in the system as "paired" but the 
+                        // connection is gone, wipe it so we can start fresh next time.
+                        if paired && !connected {
+                            log::info!("BLE: Cleanup - removing disconnected device {}", addr);
+                            let _ = adapter_cleanup.remove_device(addr).await;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     let agent = Agent {
         request_default: true,
         request_confirmation: Some(Box::new(|_req| Box::pin(async move { Ok(()) }))),
@@ -165,6 +189,11 @@ pub async fn start_ble_server(
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }
         } => {}
+    }
+    if let Ok(addrs) = adapter.device_addresses().await {
+        for addr in addrs {
+            let _ = adapter.remove_device(addr).await;
+        }
     }
 
     rfid_enabled.store(true, Ordering::Relaxed);
