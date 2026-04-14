@@ -26,7 +26,64 @@ mkdir -p "$CERTS_DIR"
 cd "$CERTS_DIR"
 
 # 3. Generate Basic/Legacy Certs (The ones you said work)
-echo "Generating CA and Server certs..."
+#!/usr/bin/env bash
+set -e
+
+IP=$(hostname -I | awk '{print $1}')
+echo "Detected broker IP: $IP"
+
+mkdir -p certs
+cd certs
+
+echo "Generating CA..."
+openssl req -x509 -new -nodes -days 365 \
+  -subj "/CN=Fog-CA" \
+  -keyout ca.key -out ca.crt
+
+echo "Generating server certificate..."
+openssl req -newkey rsa:2048 -nodes \
+  -subj "/CN=$IP" \
+  -keyout server.key -out server.csr
+
+openssl x509 -req -in server.csr \
+  -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -out server.crt -days 365
+
+
+echo "Generating fog client certificate..."
+openssl req -newkey rsa:2048 -nodes \
+  -subj "/CN=fog-client" \
+  -keyout fog.key -out fog.csr
+
+openssl x509 -req -in fog.csr \
+  -CA ca.crt -CAkey ca.key -CAcreateserial \
+  -out fog.crt -days 365
+
+rm *.csr *.srl 
+
+echo "Certificates generated successfully."
+
+echo "Generating node CA header..."
+
+OUTPUT="../../mesh_node/certs/ca_cert.hpp"
+
+mkdir -p ../../mesh_node/certs
+
+echo "#pragma once" > $OUTPUT
+echo "" >> $OUTPUT
+echo "static const char ca_cert[] = R\"EOF(" >> $OUTPUT
+
+cat ca.crt >> $OUTPUT
+
+echo ")EOF\";" >> $OUTPUT
+
+echo "ca_cert.hpp generated successfully."# Configuration - Change these to match your environment
+CA_CN="Fog-CA"
+SERVER_CN=$IP # Your Broker IP
+CLIENT_CN="fog-node-dev"
+DAYS=365
+
+# Create a temporary OpenSSL config for v3 extensions
 cat > openssl_v3.conf <<EOF
 [req]
 distinguished_name = req_distinguished_name
@@ -69,11 +126,9 @@ openssl req -new -key rust-fog.key -subj "/CN=$CLIENT_CN" -out rust-fog.csr
 openssl x509 -req -in rust-fog.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
     -out rust-fog.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_req
 
-# 8. PRE-WRITE CHECK: Verify files exist
-if [ ! -f "mesh-client.crt" ]; then
-    echo "❌ CRITICAL ERROR: mesh-client.crt was not created. Stopping."
-    exit 1
-fi
+# Cleanup
+rm *.csr openssl_v3.conf fog-ca.srl
+echo "Done! Hope the certs work well for you..."
 
 # 9. Read contents into variables (Avoids shell issues inside the file-write)
 CA_CONTENT=$(cat ca.crt)
