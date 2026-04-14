@@ -10,6 +10,7 @@ echo "Detected broker IP: $IP"
 
 mkdir -p certs
 cd certs
+mkdir -p "../mesh_esp_version/src/config/"
 
 DAYS=365
 

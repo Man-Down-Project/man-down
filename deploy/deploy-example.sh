@@ -230,9 +230,10 @@ echo "✅ DONE! Man Down is deployed and running."
 echo "🔄 Syncing generated C++ headers back to laptop..."
 
 REMOTE_HEADER="/home/$PI_USER/mesh_node/certs/ca_cert.hpp"
+REMOTE_HEADER2="/home/$PI_USER/mesh_esp_version/config/user_config.h"
 
 sshpass -p "$PI_PASS" scp -o StrictHostKeyChecking=no "$PI_USER@$PI_IP:$REMOTE_HEADER" "$LOCAL_HEADER_DIR/ca_cert.hpp"
-
+sshpass -p "$PI_PASS" scp -o StrictHostKeyChecking=no "$PI_USER@$PI_IP:$REMOTE_HEADER2" "$LOCAL_HEADER_DIR_ESP/user_config.h"
 echo "✅ Local C++ headers updated from Pi."
 
 SETUP_OUTPUT="../mesh_node/src/personal_setup.hpp"
