@@ -30,7 +30,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
         wifi_connected_globally = true;
         sync_time();
-        mqtt_app_start(BROKER_IP, MQTT_USERNAME, MQTT_PASSWORD);
+        mqtt_app_start(MQTT_BROKER, MQTT_USERNAME, MQTT_PASSWORD);
     }
 }
 
