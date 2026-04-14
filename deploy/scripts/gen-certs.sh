@@ -114,6 +114,8 @@ echo "All certificates (Legacy & Modern) generated."
 
 SECURE_OUTPUT="../mesh_node/certs/device_config.hpp"
 SECURE_OUTPUT2="../mesh_esp_version/src/config/user_config.h"
+# Ensure directory exists
+mkdir -p "$(dirname "$SECURE_OUTPUT2")"
 
 echo "#pragma once" > "$SECURE_OUTPUT2"
 
@@ -121,6 +123,7 @@ echo "// ===== WiFi =====" >> "$SECURE_OUTPUT2"
 echo "#define WIFI_SSID \"$WIFI_SSID\"" >> "$SECURE_OUTPUT2"
 echo "#define WIFI_PASS \"$WIFI_PASS\"" >> "$SECURE_OUTPUT2"
 echo "#define DEVICE_ID $DEVICE_ID" >> "$SECURE_OUTPUT2"
+
 echo "" >> "$SECURE_OUTPUT2"
 echo "// ===== MQTT =====" >> "$SECURE_OUTPUT2"
 echo "#define MQTT_BROKER \"$IP\"" >> "$SECURE_OUTPUT2"
@@ -130,6 +133,11 @@ echo "#define MQTT_PASSWORD \"$MQTT_PASS\"" >> "$SECURE_OUTPUT2"
 
 echo "" >> "$SECURE_OUTPUT2"
 echo "// ===== TLS =====" >> "$SECURE_OUTPUT2"
+
+# Safety checks
+[ -f mesh-client.crt ] || { echo "Missing mesh-client.crt"; exit 1; }
+[ -f mesh-client.key ] || { echo "Missing mesh-client.key"; exit 1; }
+[ -f fog-ca.crt ] || { echo "Missing fog-ca.crt"; exit 1; }
 
 echo "static const char client_cert[] = R\"EOF(" >> "$SECURE_OUTPUT2"
 cat mesh-client.crt >> "$SECURE_OUTPUT2"
@@ -142,3 +150,41 @@ printf "\n)EOF\";\n" >> "$SECURE_OUTPUT2"
 echo "static const char ca_cert[] = R\"EOF(" >> "$SECURE_OUTPUT2"
 cat fog-ca.crt >> "$SECURE_OUTPUT2"
 printf "\n)EOF\";\n" >> "$SECURE_OUTPUT2"
+
+# ==========================================
+# ESP CONFIG HEADER GENERATION
+# ==========================================
+
+SECURE_OUTPUT2="../../mesh_esp_version/src/config/user_config.h"
+
+mkdir -p "$(dirname "$SECURE_OUTPUT2")"
+
+echo "Generating ESP config header..."
+
+cat > "$SECURE_OUTPUT2" <<EOF
+#pragma once
+
+// ===== WiFi =====
+#define WIFI_SSID "$WIFI_SSID"
+#define WIFI_PASS "$WIFI_PASS"
+#define DEVICE_ID $DEVICE_ID
+
+// ===== MQTT =====
+#define MQTT_BROKER "$IP"
+#define MQTT_PORT 8884
+#define MQTT_USERNAME "mesh_node_$DEVICE_ID"
+#define MQTT_PASSWORD "$MQTT_PASS"
+
+// ===== TLS =====
+static const char client_cert[] = R"EOF(
+$(cat mesh-client.crt)
+)EOF";
+
+static const char client_key[] = R"EOF(
+$(cat mesh-client.key)
+)EOF";
+
+static const char ca_cert[] = R"EOF(
+$(cat fog-ca.crt)
+)EOF";
+EOF
