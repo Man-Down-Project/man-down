@@ -1,168 +1,97 @@
 #!/usr/bin/env bash
 set -e
 
-IP=${1:? "Usage: $0 <PI_IP> <WIFI_SSID> <WIFI_PASS> <DEVICE_ID>"}
-WIFI_SSID=${2:-""}
-WIFI_PASS=${3:-""}
-DEVICE_ID=${4:-""}
-MQTT_PASS=${5:-""}
-echo "Detected broker IP: $IP"
+# 1. Capture arguments with defaults to prevent empty subject lines
+IP=${1:? "Usage: $0 <PI_IP> <WIFI_SSID> <WIFI_PASS> <DEVICE_ID> <MQTT_PASS>"}
+WIFI_SSID=${2:-"Unknown_SSID"}
+WIFI_PASS=${3:-"no_password"}
+DEVICE_ID=${4:-"default_id"}
+MQTT_PASS=${5:-"dev"}
 
-mkdir -p certs
-cd certs
-mkdir -p "../mesh_esp_version/src/config/"
+# 2. Get ABSOLUTE paths (Stops the "Arduino works but ESP fails" pathing issue)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FOG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ROOT_DIR="$(cd "$FOG_DIR/.." && pwd)"
+CERTS_DIR="$FOG_DIR/certs"
 
-DAYS=365
+# Define targets using absolute paths
+ARDUINO_H="$ROOT_DIR/mesh_node/certs/ca_cert.hpp"
+ESP_H="$ROOT_DIR/mesh_esp_version/src/config/user_config.h"
 
-# ==========================================
-# 1. LEGACY CERTS (For Arduino/C++ Node)
-# ==========================================
-echo "Generating Legacy CA and Server Certs..."
-# CA for Arduino
-openssl req -x509 -new -nodes -days $DAYS \
-  -subj "/CN=Legacy-CA" \
-  -keyout ca.key -out ca.crt
+echo "📂 Project Root: $ROOT_DIR"
+echo "🔐 Target Cert Folder: $CERTS_DIR"
 
-# Server cert for Arduino (Listener 8883)
-openssl req -newkey rsa:2048 -nodes \
-  -subj "/CN=$IP" \
-  -keyout server.key -out server.csr
+mkdir -p "$CERTS_DIR"
+cd "$CERTS_DIR"
 
-openssl x509 -req -in server.csr \
-  -CA ca.crt -CAkey ca.key -CAcreateserial \
-  -out server.crt -days $DAYS
+# 3. Generate Basic/Legacy Certs (The ones you said work)
+echo "Generating CA and Server certs..."
+openssl req -x509 -new -nodes -days 365 -subj "/CN=Legacy-CA" -keyout ca.key -out ca.crt
+openssl req -newkey rsa:2048 -nodes -subj "/CN=$IP" -keyout server.key -out server.csr
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365
 
-# ==========================================
-# 2. MODERN CERTS (For Rust/Modern TLS)
-# ==========================================
-echo "Generating Modern v3 CERTS (with SAN)..."
-
+# 4. Create the v3 Config (Needed for the ESP Mesh Certs)
 cat > openssl_v3.conf << EOF
 [req]
 distinguished_name = req_distinguished_name
 prompt = no
-
 [req_distinguished_name]
 CN = Fog-CA
-
 [v3_ca]
 basicConstraints = critical, CA:TRUE
 keyUsage = critical, digitalSignature, cRLSign, keyCertSign
-
 [v3_server]
 basicConstraints = CA:FALSE
 keyUsage = digitalSignature, keyEncipherment
 extendedKeyUsage = serverAuth
 subjectAltName = IP:$IP, IP:127.0.0.1, DNS:localhost
-
 [v3_client]
 basicConstraints = CA:FALSE
 keyUsage = digitalSignature
 extendedKeyUsage = clientAuth
 EOF
-# cat > openssl_v3.conf <<EOF
-# [req]
-# distinguished_name = req_distinguished_name
-# prompt = no
-# [req_distinguished_name]
-# CN = Fog-CA
-# [v3_ca]
-# basicConstraints = critical,CA:TRUE
-# keyUsage = critical, digitalSignature, cRLSign, keyCertSign
-# [v3_req]
-# basicConstraints = CA:FALSE
-# keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-# subjectAltName = IP:$IP, IP:127.0.0.1, DNS:localhost
-# EOF
 
-# Modern CA
+# 5. Generate Modern CA
 openssl genrsa -out fog-ca.key 2048
-openssl req -x509 -new -nodes -key fog-ca.key -sha256 -days $DAYS \
-    -out fog-ca.crt -config openssl_v3.conf -extensions v3_ca -subj "/CN=Fog-CA"
+openssl req -x509 -new -nodes -key fog-ca.key -sha256 -days 365 -out fog-ca.crt -config openssl_v3.conf -extensions v3_ca -subj "/CN=Fog-CA"
 
-# Modern Server Cert (Listener 8884)
-openssl genrsa -out fog-server.key 2048
-openssl req -new -key fog-server.key -subj "/CN=$IP" -out fog-server.csr
-openssl x509 -req -in fog-server.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
-    -out fog-server.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_server
-
-# Modern Client Cert (For Rust app)
-openssl genrsa -out rust-fog.key 2048
-openssl req -new -key rust-fog.key -subj "/CN=fog-node-dev" -out rust-fog.csr
-openssl x509 -req -in rust-fog.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
-    -out rust-fog.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_client
-
-# Modern Client Cert (For Rust app)
+# 6. Generate the Mesh Client Cert (The one that was failing)
+echo "Generating Mesh Client Cert for ID: $DEVICE_ID"
 openssl genrsa -out mesh-client.key 2048
 openssl req -new -key mesh-client.key -subj "/CN=mesh-node-$DEVICE_ID" -out mesh-client.csr
-openssl x509 -req -in mesh-client.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial \
-    -out mesh-client.crt -days $DAYS -sha256 -extfile openssl_v3.conf -extensions v3_client
+openssl x509 -req -in mesh-client.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial -out mesh-client.crt -days 365 -sha256 -extfile openssl_v3.conf -extensions v3_client
 
-# ==========================================
-# 3. HEADER GENERATION
-# ==========================================
-echo "Generating node CA header..."
-OUTPUT="../../mesh_node/certs/ca_cert.hpp"
-mkdir -p "../../mesh_node/certs"
+# 7. Generate Rust Fog Cert
+openssl genrsa -out rust-fog.key 2048
+openssl req -new -key rust-fog.key -subj "/CN=fog-node-dev" -out rust-fog.csr
+openssl x509 -req -in rust-fog.csr -CA fog-ca.crt -CAkey fog-ca.key -CAcreateserial -out rust-fog.crt -days 365 -sha256 -extfile openssl_v3.conf -extensions v3_client
 
-echo "#pragma once" > "$OUTPUT"
-echo "static const char ca_cert[] = R\"EOF(" >> "$OUTPUT"
-cat ca.crt >> "$OUTPUT" # Uses the Legacy CA
-echo ")EOF\";" >> "$OUTPUT"
+# 8. PRE-WRITE CHECK: Verify files exist
+if [ ! -f "mesh-client.crt" ]; then
+    echo "❌ CRITICAL ERROR: mesh-client.crt was not created. Stopping."
+    exit 1
+fi
 
-rm *.csr *.srl openssl_v3.conf
-echo "All certificates (Legacy & Modern) generated."
+# 9. Read contents into variables (Avoids shell issues inside the file-write)
+CA_CONTENT=$(cat ca.crt)
+MESH_CRT_CONTENT=$(cat mesh-client.crt)
+MESH_KEY_CONTENT=$(cat mesh-client.key)
+FOG_CA_CONTENT=$(cat fog-ca.crt)
 
-SECURE_OUTPUT="../mesh_node/certs/device_config.hpp"
-SECURE_OUTPUT2="../mesh_esp_version/src/config/user_config.h"
-# Ensure directory exists
-mkdir -p "$(dirname "$SECURE_OUTPUT2")"
+# 10. Write Arduino Header
+echo "📝 Writing Arduino Header..."
+mkdir -p "$(dirname "$ARDUINO_H")"
+cat > "$ARDUINO_H" <<EOF
+#pragma once
+static const char ca_cert[] = R"EOF(
+$CA_CONTENT
+)EOF";
+EOF
 
-echo "#pragma once" > "$SECURE_OUTPUT2"
-
-echo "// ===== WiFi =====" >> "$SECURE_OUTPUT2"
-echo "#define WIFI_SSID \"$WIFI_SSID\"" >> "$SECURE_OUTPUT2"
-echo "#define WIFI_PASS \"$WIFI_PASS\"" >> "$SECURE_OUTPUT2"
-echo "#define DEVICE_ID $DEVICE_ID" >> "$SECURE_OUTPUT2"
-
-echo "" >> "$SECURE_OUTPUT2"
-echo "// ===== MQTT =====" >> "$SECURE_OUTPUT2"
-echo "#define MQTT_BROKER \"$IP\"" >> "$SECURE_OUTPUT2"
-echo "#define MQTT_PORT 8884" >> "$SECURE_OUTPUT2"
-echo "#define MQTT_USERNAME \"mesh_node_$DEVICE_ID\"" >> "$SECURE_OUTPUT2"
-echo "#define MQTT_PASSWORD \"$MQTT_PASS\"" >> "$SECURE_OUTPUT2"
-
-echo "" >> "$SECURE_OUTPUT2"
-echo "// ===== TLS =====" >> "$SECURE_OUTPUT2"
-
-# Safety checks
-[ -f mesh-client.crt ] || { echo "Missing mesh-client.crt"; exit 1; }
-[ -f mesh-client.key ] || { echo "Missing mesh-client.key"; exit 1; }
-[ -f fog-ca.crt ] || { echo "Missing fog-ca.crt"; exit 1; }
-
-echo "static const char client_cert[] = R\"EOF(" >> "$SECURE_OUTPUT2"
-cat mesh-client.crt >> "$SECURE_OUTPUT2"
-printf "\n)EOF\";\n" >> "$SECURE_OUTPUT2"
-
-echo "static const char client_key[] = R\"EOF(" >> "$SECURE_OUTPUT2"
-cat mesh-client.key >> "$SECURE_OUTPUT2"
-printf "\n)EOF\";\n" >> "$SECURE_OUTPUT2"
-
-echo "static const char ca_cert[] = R\"EOF(" >> "$SECURE_OUTPUT2"
-cat fog-ca.crt >> "$SECURE_OUTPUT2"
-printf "\n)EOF\";\n" >> "$SECURE_OUTPUT2"
-
-# ==========================================
-# ESP CONFIG HEADER GENERATION
-# ==========================================
-
-SECURE_OUTPUT2="../mesh_esp_version/src/config/user_config.h"
-
-mkdir -p "$(dirname "$SECURE_OUTPUT2")"
-
-echo "Generating ESP config header..."
-
-cat > "$SECURE_OUTPUT2" <<EOF
+# 11. Write ESP32 Header
+echo "📝 Writing ESP32 Header to $ESP_H"
+mkdir -p "$(dirname "$ESP_H")"
+cat > "$ESP_H" <<EOF
 #pragma once
 
 // ===== WiFi =====
@@ -178,14 +107,17 @@ cat > "$SECURE_OUTPUT2" <<EOF
 
 // ===== TLS =====
 static const char client_cert[] = R"EOF(
-$(cat mesh-client.crt)
+$MESH_CRT_CONTENT
 )EOF";
 
 static const char client_key[] = R"EOF(
-$(cat mesh-client.key)
+$MESH_KEY_CONTENT
 )EOF";
 
 static const char ca_cert[] = R"EOF(
-$(cat fog-ca.crt)
+$FOG_CA_CONTENT
 )EOF";
 EOF
+
+rm -f *.csr *.srl openssl_v3.conf
+echo "✅ SUCCESS: All certs and headers created."
