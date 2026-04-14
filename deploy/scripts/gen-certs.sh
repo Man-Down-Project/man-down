@@ -155,7 +155,7 @@ printf "\n)EOF\";\n" >> "$SECURE_OUTPUT2"
 # ESP CONFIG HEADER GENERATION
 # ==========================================
 
-SECURE_OUTPUT2="../../mesh_esp_version/src/config/user_config.h"
+SECURE_OUTPUT2="../mesh_esp_version/src/config/user_config.h"
 
 mkdir -p "$(dirname "$SECURE_OUTPUT2")"
 
