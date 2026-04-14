@@ -24,6 +24,12 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
 
+#[derive(Debug, Clone)]
+struct PendingDeviceSelection {
+    device_id: String,
+    selected_at: chrono::DateTime<Utc>,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
@@ -77,8 +83,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
     let ble_running = Arc::new(Mutex::new(false));
-
     let rfid_enabled = Arc::new(AtomicBool::new(true));
+    let selected_device = Arc::new(Mutex::new(None::<PendingDeviceSelection>));
 
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     start_rfid_reader_thread(tag_tx, rfid_enabled.clone());
@@ -105,7 +111,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     publish_initial_provisioning(&outgoing_tx, &provisioning_state).await;
 
-    let processor = run_processor(rx, storage, ble_running.clone(), rfid_enabled.clone());
+    let processor = run_processor(
+        rx,
+        storage,
+        ble_running.clone(),
+        rfid_enabled.clone(),
+        selected_device.clone(),
+    );
 
     tokio::select! {
         _= tokio::signal::ctrl_c() => {
@@ -147,11 +159,44 @@ async fn run_processor(
     storage: Storage,
     ble_running: Arc<Mutex<bool>>,
     rfid_enabled: Arc<AtomicBool>,
+    selected_device: Arc<Mutex<Option<PendingDeviceSelection>>>,
 ) {
-    while let Some(env) = rx.recv().await {
+    while let Some(mut env) = rx.recv().await {
         if let Err(e) = env.validate_basic() {
             log::warn!("Dropped invalid envelope: {}", e);
             continue;
+        }
+        // TEMP: treat non-login/logout as edge selection
+        match &env.incident {
+            Incident::Login { .. } | Incident::Logout { .. } => {
+                // handled below
+            }
+            _ => {
+                let mut selected = selected_device.lock().await;
+
+                *selected = Some(PendingDeviceSelection {
+                    device_id: env.device_id.clone(),
+                    selected_at: Utc::now(),
+                });
+
+                log::info!("Selected device: {}", env.device_id);
+                continue;
+            }
+        }
+
+        match &env.incident {
+            Incident::Login { .. } | Incident::Logout { .. } => {
+                let mut selected = selected_device.lock().await;
+
+                let Some(device) = selected.as_ref() else {
+                    log::warn!("No selected device for auth event");
+                    continue;
+                };
+
+                env.device_id = device.device_id.clone();
+                *selected = None;
+            }
+            _ => {}
         }
 
         if let Err(e) = storage.insert_event(&env) {

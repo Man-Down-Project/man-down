@@ -50,6 +50,12 @@ pub enum FaultSeverity {
 
 impl Envelope {
     pub fn validate_basic(&self) -> Result<(), String> {
+        self.validate_common()?;
+        self.validate_incident()?;
+        Ok(())
+    }
+
+    fn validate_common(&self) -> Result<(), String> {
         if self.device_id.trim().is_empty() {
             return Err("device_id is empty".into());
         }
@@ -63,7 +69,7 @@ impl Envelope {
         if self.device_id.len() > 3 {
             return Err(format!("device_id too long: {}", self.device_id));
         }
-        
+
         let allowed_devices = ["1", "2", "3"];
         if !allowed_devices.contains(&self.device_id.as_str()) {
             return Err(format!("device_id not allowed: {}", self.device_id));
@@ -91,31 +97,43 @@ impl Envelope {
         if self.received_at > Utc::now() + ChronoDuration::minutes(5) {
             return Err("received_at too far in future".into());
         }
-        if let Incident::BatteryLow { battery_level } = &self.incident {
-            if *battery_level > 100 {
-                return Err(format!("Invalid battery level: {}", battery_level));
-            }
-        }
-        if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &self.incident {
-            if worker_id.trim().is_empty() {
-                return Err("worker_id is empty".into());
-            }
 
-            if worker_id.len() > 32 {
-                return Err(format!("worker_id too long: {}", worker_id));
-            }
-        }
-        if let Incident::ManDown { zone_hint } = &self.incident {
-            if let Some(zone) = zone_hint {
-                if zone.trim().is_empty() {
-                    return Err("zone_hint is empty".into());
-                }
+        Ok(())
+    }
 
-                if zone.len() > 16 {
-                    return Err(format!("zone_hint too long: {}", zone));
+    fn validate_incident(&self) -> Result<(), String> {
+        match &self.incident {
+            Incident::BatteryLow { battery_level } => {
+                if *battery_level > 100 {
+                    return Err(format!("invalid battery level: {}", battery_level));
                 }
             }
+
+            Incident::Login { worker_id } | Incident::Logout { worker_id } => {
+                if worker_id.trim().is_empty() {
+                    return Err("worker_id is empty".into());
+                }
+
+                if worker_id.len() > 32 {
+                    return Err(format!("worker_id too long: {}", worker_id));
+                }
+            }
+
+            Incident::ManDown { zone_hint } => {
+                if let Some(zone) = zone_hint {
+                    if zone.trim().is_empty() {
+                        return Err("zone_hint is empty".into());
+                    }
+
+                    if zone.len() > 16 {
+                        return Err(format!("zone_hint too long: {}", zone));
+                    }
+                }
+            }
+
+            Incident::Gas | Incident::MeshDisconnect { .. } | Incident::SensorFault { .. } => {}
         }
+
         Ok(())
     }
 }
