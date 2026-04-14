@@ -10,8 +10,11 @@
 #include "esp_wifi.h"
 #include "esp_mac.h"
 
-extern const uint8_t broker_ca_cert_pem_start[] asm("_binary_broker_ca_cert_pem_start");
-extern const uint8_t broker_ca_cert_pem_end[]   asm("_binary_broker_ca_cert_pem_end");
+// extern const uint8_t broker_ca_cert_pem_start[] asm("_binary_broker_ca_cert_pem_start");
+// extern const uint8_t broker_ca_cert_pem_end[]   asm("_binary_broker_ca_cert_pem_end");
+// extern const char ca_cert[];
+// extern const char client_key[];
+// extern const char client_cert[];
 static const char *TAG = "[MQTT]";
 
 esp_mqtt_client_handle_t mqtt_client = NULL;
@@ -88,17 +91,17 @@ void mqtt_app_start(const char* uri, const char* user, const char* pass)
         .credentials.authentication.password = pass,
         .credentials.authentication.certificate = client_cert,
         .credentials.authentication.key = client_key,
+        .broker.verification.certificate = ca_cert,
         .broker.verification.skip_cert_common_name_check = true,
         .session.keepalive = 60,
     };
-    
     uint8_t *cert = NULL;
     size_t cert_len = 0;
 
     if (load_ca_cert(&cert, &cert_len))
     {
         ESP_LOGI(TAG, "Using stored CA cert");
-        mqtt_cfg.broker.verification.certificate = (const char *)cert;
+        mqtt_cfg.broker.verification.certificate = (const char *)ca_cert;
     } else {
         ESP_LOGI(TAG, "Using default CA cert");
         mqtt_cfg.broker.verification.certificate = ca_cert;
