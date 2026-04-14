@@ -86,8 +86,6 @@ void mqtt_app_start(const char* uri, const char* user, const char* pass)
         .credentials.username = user,
         .credentials.client_id = client_id,
         .credentials.authentication.password = pass,
-        .credentials.authentication.certificate = client_cert,
-        .credentials.authentication.key = client_key,
         .broker.verification.skip_cert_common_name_check = true,
         .session.keepalive = 60,
     };
@@ -112,5 +110,3 @@ void mqtt_app_start(const char* uri, const char* user, const char* pass)
     );
     esp_mqtt_client_start(mqtt_client);
 }
-
-
