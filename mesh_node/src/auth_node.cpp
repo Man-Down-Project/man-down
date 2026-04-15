@@ -2,6 +2,7 @@
 #include <Crypto.h>
 #include <SHA256.h>
 #include <stddef.h>
+#include "edge_event.hpp"
 #include "auth_node.hpp"
 
 AuthNode authNode;
@@ -10,11 +11,11 @@ runtime_compare _seq_cache;
 AuthNode::AuthNode() {
 
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) {
-        _ram_auth.device_whitelist[i] = EMPTY_ID;
+        memset(_ram_auth.device_whitelist[i], EMPTY_ID, MAC_LEN);
     }
     
-    memset(_seq_cache.device_id, EMPTY_ID, MAX_APPROVED_EDGE);
-    memset(_seq_cache.last_seq, 0xFF, MAX_APPROVED_EDGE);
+    memset(_seq_cache.device_mac, EMPTY_ID, sizeof(_seq_cache.device_mac));
+    memset(_seq_cache.last_seq, 0xFF, sizeof(_seq_cache.device_mac));
 
     memset(_ram_auth.auth.shared_key, 0, KEY_LEN);
     _ram_auth.auth.key_timestamp = 0;
@@ -27,7 +28,7 @@ bool AuthNode::isStorageEmpty(){
         return false;
 
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_ram_auth.device_whitelist[i] != EMPTY_ID){
+        if(_ram_auth.device_whitelist[i][0] != EMPTY_ID){
             return false;
         }
     }
@@ -64,7 +65,7 @@ void AuthNode::loadAuthorizedEdges() {
         _ram_auth.auth.key_timestamp = 0;
 
         for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-            _ram_auth.device_whitelist[i] = EMPTY_ID;
+            memset(_ram_auth.device_whitelist[i], EMPTY_ID, MAC_LEN);
         }
         EEPROM.put(0, _ram_auth);
 
@@ -90,13 +91,13 @@ bool constTimeComp(const uint8_t* a, const uint8_t* b, size_t len){
 bool AuthNode::validateEdge(edge_event_t* pkt) {
     if (!pkt) return false;
 
-    uint8_t device_id = pkt->device_id;
+    const uint8_t* mac = pkt->device_id.mac;
     uint8_t seq = pkt->seq;
     
-    int idx = -1;
+        int idx = -1;
 
     for (int i = 0; i < MAX_APPROVED_EDGE; i++) { // detect duplication
-        if (_ram_auth.device_whitelist[i] == device_id) {
+        if (memcmp(_ram_auth.device_whitelist[i], mac, MAC_LEN) == 0) {
             idx = i;
             break;
         }
@@ -143,7 +144,7 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
     uint8_t last = 0xFF;
 
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_seq_cache.device_id[i] == device_id){
+        if(memcmp(_seq_cache.device_mac[i], mac, MAC_LEN) == 0){
             last = _seq_cache.last_seq[i];
             break;
         }
@@ -155,7 +156,7 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
     bool updated = false;
     
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_seq_cache.device_id[i] == device_id){
+        if(memcmp(_seq_cache.device_mac[i], mac, MAC_LEN) == 0){
             _seq_cache.last_seq[i] = seq;
             updated = true;
             break;
@@ -164,8 +165,8 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 
     if(!updated){
         for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-            if(_seq_cache.device_id[i] == EMPTY_ID){
-                _seq_cache.device_id[i] = device_id;
+            if(_seq_cache.device_mac[i][0] == EMPTY_ID){
+                memcpy(_seq_cache.device_mac[i], mac, MAC_LEN);
                 _seq_cache.last_seq[i] = seq;
                 break;
             }
@@ -176,10 +177,10 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 }
 
 
-bool AuthNode::addDeviceToWhitelist(uint8_t device_id){
+bool AuthNode::addDeviceToWhitelist(const uint8_t mac[MAC_LEN]){
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_ram_auth.device_whitelist[i] == EMPTY_ID){
-            _ram_auth.device_whitelist[i] = device_id;
+        if(_ram_auth.device_whitelist[i][0] == EMPTY_ID){
+            memcpy(_ram_auth.device_whitelist[i], mac, MAC_LEN);
             return true;
         }
     }
@@ -188,51 +189,58 @@ bool AuthNode::addDeviceToWhitelist(uint8_t device_id){
 }
 
 
-bool AuthNode::removeDeviceFromWhitelist(uint8_t device_id) {
+bool AuthNode::removeDeviceFromWhitelist(const uint8_t mac[MAC_LEN]) {
+    if(!mac) return false;
+
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_ram_auth.device_whitelist[i] == device_id){
-            _ram_auth.device_whitelist[i] = EMPTY_ID;
+        if(memcmp(_ram_auth.device_whitelist[i], mac, MAC_LEN) == 0){
+            memset(_ram_auth.device_whitelist[i], EMPTY_ID, MAC_LEN);
             return true;
         }
     }
     return false; //Device not found
 }
 
-int whitelistCompare(const uint8_t a[],int aLen, const uint8_t b[],int bLen, uint8_t out[]){
+int whitelistCompare(const uint8_t a[][MAC_LEN],int aLen, const uint8_t b[][MAC_LEN],int bLen, uint8_t out[][MAC_LEN]){
 
     int outIndex = 0;
 
     for(int i = 0; i < aLen; i++){
         
-        if(a[i] == EMPTY_ID)
-            continue;
+        bool empty = true;
+        for(int k = 0; k < MAC_LEN; k++){
+            if(a[i][k] != EMPTY_ID){
+                empty = false;
+                break;
+            }
+        }
+        if(empty) continue;
 
         bool found = false;
 
         for(int j = 0; j < bLen; j++){
-            if(b[j] == EMPTY_ID)
-            continue;
-
-            if(a[i] == b[j]){
+            if(memcmp(a[i], b[j], MAC_LEN) == 0){
                 found = true;
                 break;
             }
-        }
-
+        }   
         //duplicate protection from provision packet
         if(!found){ 
             bool existsInOutput = false;
 
             for(int k = 0; k < outIndex; k++){
-                if(out[k] == a[i]){
+                if(memcmp(out[k], a[i], MAC_LEN) == 0){
                     existsInOutput = true;
                     break;
                 }
             }
             //add new edge_id to add list
-            if(!existsInOutput)
-                out[outIndex++] = a[i];
-        }
+            if(!existsInOutput){
+                memcpy(out[outIndex], a[i], MAC_LEN);
+                outIndex++;
+            }
+        }   
+
         
       
     }
@@ -245,17 +253,17 @@ int AuthNode::countWhitelist(){
     int count = 0;
 
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_ram_auth.device_whitelist[i] != EMPTY_ID){
-            count++;
+        if(_ram_auth.device_whitelist[i][0] != EMPTY_ID){
+                count++;
+            }
         }
-    }
     return count;
 }
 
-void AuthNode::commitWhitelistIfChange(uint8_t* provisionedList, int provCount){
+void AuthNode::commitWhitelistIfChange(const uint8_t provisionedList[][MAC_LEN], int provCount){
 
-    uint8_t addList[MAX_APPROVED_EDGE];
-    uint8_t removeList[MAX_APPROVED_EDGE];
+    uint8_t addList[MAX_APPROVED_EDGE][MAC_LEN];
+    uint8_t removeList[MAX_APPROVED_EDGE][MAC_LEN];
 
     int curentCount = countWhitelist();
 
@@ -281,6 +289,11 @@ void AuthNode::commitWhitelistIfChange(uint8_t* provisionedList, int provCount){
 
     persistEEPROM();
 
+}
+
+const uint8_t* AuthNode::getWhiteListEntry(int i) const {
+    if(i < 0 || i >= MAX_APPROVED_EDGE) return nullptr;
+        return _ram_auth.device_whitelist[i];
 }
 
 
@@ -343,45 +356,7 @@ bool hexStringToByte(const char* str, uint8_t* out, size_t outLen){
     return true;
 }
 
-void AuthNode::AuthEnrollmentFromSerial(){
-    
-    uint8_t buffer[21];
-    uint8_t idx = 0;
-    unsigned long start = millis();
 
-    while(idx < sizeof(buffer)){
-        if(Serial.available()){
-            buffer[idx++] = Serial.read();
-        }
-
-        delay(1);
-
-        if(millis() - start > 3000){
-            Serial.println("Provision timeout");
-            return;
-        }
-    }
-
-    //packet parsing
-    uint8_t device_id = buffer[0];
-    uint8_t* new_key = &buffer[1];
-    uint32_t new_ts =
-    ((uint32_t)buffer[17] << 24) |
-    ((uint32_t)buffer[18] << 16) |
-    ((uint32_t)buffer[19] << 8)  |
-    ((uint32_t)buffer[20]);
-
-    if(device_id == EMPTY_ID){
-        Serial.println("Invalid device id");
-        return;
-    }
-
-    updateGlobalKey(new_key, new_ts);
-
-    addDeviceToWhitelist(device_id);
-
-    Serial.println("Serial provision complete");
-}
 
 void AuthNode::persistEEPROM() {
     EEPROM.put(0, _ram_auth);
@@ -438,3 +413,42 @@ void AuthNode::begin(uint8_t node_id) { //fake for key test, shold be remove lat
 }
 */
 //test end
+/*void AuthNode::AuthEnrollmentFromSerial(){
+    
+    uint8_t buffer[21];
+    uint8_t idx = 0;
+    unsigned long start = millis();
+
+    while(idx < sizeof(buffer)){
+        if(Serial.available()){
+            buffer[idx++] = Serial.read();
+        }
+
+        delay(1);
+
+        if(millis() - start > 3000){
+            Serial.println("Provision timeout");
+            return;
+        }
+    }
+
+    //packet parsing
+    uint8_t device_id = buffer[0];
+    uint8_t* new_key = &buffer[1];
+    uint32_t new_ts =
+    ((uint32_t)buffer[17] << 24) |
+    ((uint32_t)buffer[18] << 16) |
+    ((uint32_t)buffer[19] << 8)  |
+    ((uint32_t)buffer[20]);
+
+    if(device_id == EMPTY_ID){
+        Serial.println("Invalid device id");
+        return;
+    }
+
+    updateGlobalKey(new_key, new_ts);
+
+    addDeviceToWhitelist(device_id);
+
+    Serial.println("Serial provision complete");
+}*/

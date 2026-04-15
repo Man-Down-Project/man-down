@@ -20,6 +20,7 @@ BLECharacteristic ackTX(
     BLE_ACK_SIZE   
 );
 
+
 static uint8_t last_seq_per_edge[MAX_EDGE_DEVICES];
 
 static uint8_t session_packet_count = 0;
@@ -76,17 +77,19 @@ void ble_poll(AuthNode &auth){
     }
 
     edge_event_t* pkt = (edge_event_t*)buf;
-    uint8_t device_id = pkt->device_id;
+    const uint8_t* mac = pkt->device_id.mac;
     uint8_t seq = pkt->seq;
-
-    if (device_id >= MAX_EDGE_DEVICES){
-      Serial.println("Invalid device_id");
-      return;
-    }
 
 
     Serial.print("Packet from device: ");
-    Serial.print(device_id);
+    Serial.print("MAC: ");
+    for(int i = 0; i < 6; i++){
+      Serial.print(mac[i], HEX);
+      if(i < 5)
+        Serial.print(":");
+    }
+    Serial.println();
+
     Serial.print(" seq: ");
     Serial.println(seq);
 
@@ -140,15 +143,53 @@ void ble_poll(AuthNode &auth){
 
 }
 
-// demo
+bool isMacInWhitelist(const uint8_t* mac, AuthNode &auth){
+  for(int i = 0; i < MAX_APPROVED_EDGE; i++){
+    const uint8_t* entry = auth.getWhiteListEntry(i);
+
+    if(!entry) continue;
+    if(entry[0] == EMPTY_ID) continue;
+
+    if(memcmp(mac, entry, 6) == 0){
+      return true;
+    }
+  }
+
+  return false;
+}
 
 void ble_loop(AuthNode &auth){ 
   BLE.poll();
   BLEDevice central = BLE.central();
 
-  if (central) {
+  if(central) {
     Serial.print("Edge connected: ");
     Serial.println(central.address());
+
+    uint8_t mac[6];
+
+    String addr = central.address();
+    addr.trim();
+
+    int parsed = sscanf(addr.c_str(),
+      "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
+      &mac[0], &mac[1], &mac[2],
+      &mac[3], &mac[4], &mac[5]);
+
+    if(parsed != 6){
+      Serial.println("MAC parse failed");
+      central.disconnect();
+      return;
+    }
+
+    if(!isMacInWhitelist(mac, auth)){
+      Serial.println("Unauthorized device- disconnecting");
+      central.disconnect();
+      return;
+    }
+
+    Serial.println("AUthorized edge");
+  
 
     while (central.connected()){
       BLE.poll();
@@ -157,9 +198,9 @@ void ble_loop(AuthNode &auth){
     Serial.println("Edge disconnected");
     Serial.println("");
 
-      if (!BLE.connected()) {
-        BLE.advertise();
-      }
+      
+    BLE.advertise();
+      
   }
 }
 

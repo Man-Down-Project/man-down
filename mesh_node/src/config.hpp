@@ -21,6 +21,8 @@
 #define KEY_LEN 16
 #define EEPROM_START 0
 #define MAX_TOPIC_SIZE 64
+#define MAC_LEN 6
+
 
 #define MAX_NEIGHBORS 5
 #define MAX_APPROVED_EDGE 10

@@ -15,21 +15,23 @@ public:
 
     bool validateEdge(edge_event_t* pkt); // Device authorize and duplicate check
 
-    bool addDeviceToWhitelist(uint8_t device_id); // Update id whitelist
+    bool addDeviceToWhitelist(const uint8_t mac[MAC_LEN]); // Update id whitelist
 
-    bool removeDeviceFromWhitelist(uint8_t device_id);
+    bool removeDeviceFromWhitelist(const uint8_t mac[MAC_LEN]);
 
     void AuthEnrollmentFromSerial(); //Provision one full edge regestration packet
 
     void updateGlobalKey(uint8_t* new_key, uint32_t new_ts);
 
-    void commitWhitelistIfChange(uint8_t* provisionedList, int provCount);
+    void commitWhitelistIfChange(const uint8_t provisionedList[][MAC_LEN], int provCount);
 
     int countWhitelist();
 
     void persistEEPROM(); // store authorized edge from RAM to EEPROM
 
     bool isStorageEmpty();
+
+    const uint8_t* getWhiteListEntry(int i) const;
     
     const uint8_t* getSharedKey() const;
 
@@ -40,7 +42,7 @@ private:
     bool validateHMAC(edge_event_t* pkt, uint8_t* key);
 };
 
-int whitelistCompare(const uint8_t a[],int aLen, const uint8_t b[],int bLen, uint8_t out[]);
+int whitelistCompare(const uint8_t a[][MAC_LEN],int aLen, const uint8_t b[][MAC_LEN],int bLen, uint8_t out[][MAC_LEN]);
 bool constTimeComp(const uint8_t* a, const uint8_t* b, size_t len);
 bool hexCharToByte(char c, uint8_t &out);
 bool hexStringToByte(const char* str, uint8_t* out, size_t outLen);

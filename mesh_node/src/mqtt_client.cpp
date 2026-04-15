@@ -134,15 +134,15 @@ bool mqtt_publisher_edge_event(const edge_event_t* pkt) {
 
     msg.timestamp = GetTimeStamp();
     
-    uint8_t data[7] = {
-        msg.device_id,
-        msg.event_type,
-        msg.location,
-        msg.battery,
-        msg.seq,
-        (uint8_t)(msg.timestamp >> 8),
-        (uint8_t)(msg.timestamp & 0XFF)
-    };
+    uint8_t data[12];
+
+    memcpy(&data[0], msg.device_id.mac, MAC_LEN);
+    data[6] = msg.event_type;
+    data[7] = msg.location;
+    data[8] = msg.battery;
+    data[9] = msg.seq;
+    data[10] = (uint8_t)(msg.timestamp >> 8);
+    data[11] = (uint8_t)(msg.timestamp & 0XFF);
 
     compute_hmac16(
         authNode.getSharedKey(),
@@ -206,10 +206,10 @@ void handle_edgeid_provision(byte* payload, unsigned int length){
     memcpy(buffer, payload, length);
     buffer[length] = '\0';
 
-    uint8_t provisioned[MAX_APPROVED_EDGE];
+    uint8_t provisioned[MAX_APPROVED_EDGE][MAC_LEN];
 
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        provisioned[i] = EMPTY_ID;
+        memset(provisioned[i], EMPTY_ID, MAC_LEN);
     }
 
     int count = 0;
@@ -221,7 +221,10 @@ void handle_edgeid_provision(byte* payload, unsigned int length){
         int id = atoi(token);
 
         if(id > 0 && id < 255){
-            provisioned[count++] = (uint8_t)id;
+            for(int j = 0; j < MAC_LEN; j++){
+                provisioned[count][j] = (uint8_t)id;
+            }
+            count++;
         }
 
         token = strtok(nullptr, ",");
