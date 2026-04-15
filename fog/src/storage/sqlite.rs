@@ -126,7 +126,7 @@ impl Storage {
     pub fn bind_mac_to_edge_tag(&self, rfid_tag: &str, mac_address: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE device_whitelist
-         SET mac_address = ?1,
+         SET mac = ?1,
              active = 1
          WHERE rfid_tag = ?2",
             params![mac_address, rfid_tag],
