@@ -5,4 +5,5 @@ deploy/aclfile
 deploy/passwordfile
 deploy/mosquitto-dev.conf
 fog/man_down.service
-deploy/certs
+deploy/certs  
+deploy/mesh_node
