@@ -18,7 +18,7 @@ use crate::provisioning::scheduler::run_hmac_rotation_scheduler;
 use crate::provisioning::state::{hmac_needs_rotation, load_hmac_state, save_hmac_state};
 use crate::rfid::reader::start_rfid_reader_thread;
 use crate::rfid::service::run_rfid_service;
-use crate::shared_state::PendingDeviceSelection;
+use crate::shared_state::AppState;
 use crate::storage::Storage;
 use chrono::Utc;
 use std::fs;
@@ -75,19 +75,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let (tx, rx) = mpsc::channel::<Envelope>(100);
     let (tag_tx, tag_rx) = mpsc::channel::<String>(32);
+    let (edge_event_tx, edge_event_rx) = mpsc::channel::<crate::rfid::models::RfidEvent>(32);
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let (outgoing_tx, outgoing_rx) = mpsc::channel::<OutgoingMessage>(10);
 
     let ble_running = Arc::new(Mutex::new(false));
     let rfid_enabled = Arc::new(AtomicBool::new(true));
-    let selected_device = Arc::new(Mutex::new(None::<PendingDeviceSelection>));
+    let app_state = Arc::new(Mutex::new(AppState::default()));
 
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
     start_rfid_reader_thread(tag_tx, rfid_enabled.clone());
 
     let rfid_tx = tx.clone();
+    let edge_event_tx_for_rfid = edge_event_tx.clone();
+
     let rfid_task = tokio::spawn(async move {
-        run_rfid_service(tag_rx, rfid_tx).await;
+        run_rfid_service(tag_rx, rfid_tx, edge_event_tx_for_rfid).await;
     });
 
     let scheduler_tx = outgoing_tx.clone();
@@ -109,10 +112,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let processor = run_processor(
         rx,
+        edge_event_rx,
         storage.clone(),
         ble_running.clone(),
         rfid_enabled.clone(),
-        selected_device.clone(),
+        app_state.clone(),
     );
 
     tokio::select! {
@@ -152,93 +156,184 @@ async fn publish_initial_provisioning(
 
 async fn run_processor(
     mut rx: mpsc::Receiver<Envelope>,
+    mut edge_event_rx: mpsc::Receiver<crate::rfid::models::RfidEvent>,
     storage: Arc<Storage>,
     ble_running: Arc<Mutex<bool>>,
     rfid_enabled: Arc<AtomicBool>,
-    selected_device: Arc<Mutex<Option<PendingDeviceSelection>>>,
+    app_state: Arc<Mutex<AppState>>,
 ) {
-    while let Some(mut env) = rx.recv().await {
-        if let Err(e) = env.validate_basic() {
-            log::warn!("Dropped invalid envelope: {}", e);
-            continue;
-        }
-
-        match &env.incident {
-            Incident::Login { .. } | Incident::Logout { .. } => {
-                let mut selected = selected_device.lock().await;
-
-                let Some(device) = selected.as_ref() else {
-                    log::warn!("No selected device for auth event");
-                    continue;
-                };
-
-                if Utc::now() - device.selected_at > chrono::Duration::seconds(10) {
-                    log::warn!("Selected device expired");
-                    *selected = None;
-                    continue;
-                }
-                env.device_id = device.device_id.clone();
-                *selected = None;
+    loop {
+        tokio::select! {
+                Some(edge_event) = edge_event_rx.recv() => {
+                    match edge_event {
+                        crate::rfid::models::RfidEvent::EdgeTag { tag_id } => {
+                            match storage.edge_tag_exists(&tag_id) {
+                                Ok(true) => {
+            {
+                let mut state = app_state.lock().await;
+                state.pending_edge_tag = Some(crate::shared_state::PendingEdgeTag {
+                    rfid_tag: tag_id.clone(),
+                    selected_at: Utc::now(),
+                });
             }
-            _ => {}
-        }
 
-        match storage.is_device_allowed(&env.device_id) {
-            Ok(true) => {}
-            Ok(false) => {
-                log::warn!(
-                    "Dropped event from non-whitelisted device: {}",
-                    env.device_id
-                );
+            log::info!("Edge tag approved and stored as pending: {}", tag_id);
+
+            let mut running = ble_running.lock().await;
+            if *running {
+                log::info!("BLE: provisioning already running, keeping current session");
                 continue;
             }
-            Err(e) => {
-                log::error!("Failed to check device whitelist: {}", e);
-                continue;
-            }
-        }
 
-        if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &env.incident {
-            match storage.is_worker_allowed(worker_id) {
-                Ok(true) => {}
-                Ok(false) => {
-                    log::warn!("Dropped event from non-whitelisted worker: {}", worker_id);
+            *running = true;
+            drop(running);
+
+            let hmac_state = match crate::provisioning::state::load_hmac_state() {
+                Some(h) => h,
+                None => {
+                    log::error!("BLE: no HMAC state found on disk");
+                    let mut running = ble_running.lock().await;
+                    *running = false;
                     continue;
                 }
-                Err(e) => {
-                    log::error!("Worker whitelist check failed: {}", e);
+            };
+
+            let ble_data = BleProvisioningData::from_hmac_state(&hmac_state);
+            let ble_running_for_server = ble_running.clone();
+            let ble_running_for_timer = ble_running.clone();
+            let rfid_enabled_for_ble = rfid_enabled.clone();
+            let app_state_for_ble = app_state.clone();
+
+            let (ble_stop_tx, ble_stop_rx) = tokio::sync::oneshot::channel();
+
+            tokio::spawn(async move {
+                log::info!("BLE: starting provisioning from edge tag scan");
+
+                if let Err(e) =
+                    start_ble_server(ble_data, ble_stop_rx, rfid_enabled_for_ble, app_state_for_ble).await
+                {
+                    log::error!("BLE error: {}", e);
+                }
+
+                let mut running = ble_running_for_server.lock().await;
+                *running = false;
+                log::info!("BLE: provisioning marked as stopped");
+            });
+
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                let _ = ble_stop_tx.send(());
+                log::info!("BLE: provisioning window closed");
+
+                let mut running = ble_running_for_timer.lock().await;
+                *running = false;
+            });
+        }
+                                Ok(false) => {
+                                    log::warn!("Edge tag not found in whitelist: {}", tag_id);
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to check edge tag {} in whitelist: {}", tag_id, e);
+                                }
+                            }
+                        }
+                        crate::rfid::models::RfidEvent::Worker(_) => {
+                            // används inte ännu
+                        }
+                    }
+                }
+
+                Some(mut env) = rx.recv() => {
+                if let Err(e) = env.validate_basic() {
+                    log::warn!("Dropped invalid envelope: {}", e);
                     continue;
                 }
-            }
-        }
 
-        if let Err(e) = storage.insert_event(&env) {
-            log::error!("Failed to store event: {}", e);
-        }
+                    match &env.incident {
+                        Incident::Login { .. } | Incident::Logout { .. } => {
+                            let mut state = app_state.lock().await;
 
-        if let Err(e) = storage.insert_auth_event(&env) {
-            log::error!("Failed to store auth event: {}", e);
-        } else {
-            log::info!("Stored auth event: {:?}", env.incident);
-        }
+                            let Some(device) = state.selected_device.as_ref() else {
+                                log::warn!("No selected device for auth event");
+                                continue;
+                            };
 
-        process_envelope(
-            env,
-            ble_running.clone(),
-            rfid_enabled.clone(),
-            selected_device.clone(),
-        )
-        .await;
+                            if Utc::now().signed_duration_since(device.selected_at)
+                                > chrono::Duration::seconds(10)
+                            {
+                                log::warn!("Selected device expired");
+                                state.selected_device = None;
+                                continue;
+                            }
+
+                            env.device_id = device.device_id.clone();
+                            state.selected_device = None;
+                        }
+                        _ => {}
+                    }
+
+                    match storage.edge_tag_exists(&env.device_id) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            log::warn!(
+                                "Dropped event from non-whitelisted device: {}",
+                                env.device_id
+                            );
+                            continue;
+                        }
+                        Err(e) => {
+                            log::error!("Failed to check device whitelist: {}", e);
+                            continue;
+                        }
+                    }
+
+                    if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &env.incident {
+                        match storage.is_worker_allowed(worker_id) {
+                            Ok(true) => {}
+                            Ok(false) => {
+                                log::warn!("Dropped event from non-whitelisted worker: {}", worker_id);
+                                continue;
+                            }
+                            Err(e) => {
+                                log::error!("Worker whitelist check failed: {}", e);
+                                continue;
+                            }
+                        }
+                    }
+
+                    if let Err(e) = storage.insert_event(&env) {
+                    log::error!("Failed to store event: {}", e);
+                    }
+
+                    if let Err(e) = storage.insert_auth_event(&env) {
+                        log::error!("Failed to store auth event: {}", e);
+                    } else {
+                        log::info!("Stored auth event: {:?}", env.incident);
+                    }
+
+                    process_envelope(
+                        env,
+                        ble_running.clone(),
+                        rfid_enabled.clone(),
+                        app_state.clone(),
+                    )
+                    .await;
+                    }
+
+                    else => {
+                        log::info!("Processor: channels closed, exiting");
+                        break;
+                    }
+
+                    }
     }
-
-    log::info!("Processor: channel closed, exiting");
 }
 
 async fn process_envelope(
     env: Envelope,
     ble_running: Arc<Mutex<bool>>,
     rfid_enabled: Arc<AtomicBool>,
-    selected_device: Arc<Mutex<Option<PendingDeviceSelection>>>,
+    app_state: Arc<Mutex<AppState>>,
 ) {
     let _ = &rfid_enabled;
     log::info!(
@@ -286,14 +381,13 @@ async fn process_envelope(
 
             let (tx, rx) = tokio::sync::oneshot::channel();
             let rfid_enabled_for_ble = rfid_enabled.clone();
-            let selected_device_for_ble = selected_device.clone();
+            let app_state_for_ble = app_state.clone();
 
             tokio::spawn(async move {
                 log::info!("BLE: starting provisioning (10 secound window)");
 
                 if let Err(e) =
-                    start_ble_server(ble_data, rx, rfid_enabled_for_ble, selected_device_for_ble)
-                        .await
+                    start_ble_server(ble_data, rx, rfid_enabled_for_ble, app_state_for_ble).await
                 {
                     log::error!("BLE error: {}", e);
                 }

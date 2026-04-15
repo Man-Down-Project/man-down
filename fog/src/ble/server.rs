@@ -35,7 +35,7 @@ pub async fn start_ble_server(
     data: BleProvisioningData,
     stop: tokio::sync::oneshot::Receiver<()>,
     rfid_enabled: Arc<AtomicBool>,
-    selected_device: Arc<tokio::sync::Mutex<Option<crate::shared_state::PendingDeviceSelection>>>,
+    app_state: Arc<tokio::sync::Mutex<crate::shared_state::AppState>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("BLE: starting provisioning server");
     rfid_enabled.store(false, Ordering::Relaxed);
@@ -51,7 +51,7 @@ pub async fn start_ble_server(
 
     // this is supposed to remove the bond data after disconnect
     let adapter_cleanup = adapter.clone();
-    let selected_device_for_monitor = selected_device.clone();
+    let app_state_for_monitor = app_state.clone();
 
     tokio::spawn(async move {
         log::info!("BLE: Bond cleanup monitor started");
@@ -64,19 +64,20 @@ pub async fn start_ble_server(
                         let paired = device.is_paired().await.unwrap_or(false);
 
                         if connected {
-                            let mut selected = selected_device_for_monitor.lock().await;
+                            let mut state = app_state_for_monitor.lock().await;
                             let addr_str = addr.to_string();
 
-                            let should_update = match selected.as_ref() {
+                            let should_update = match state.selected_device.as_ref() {
                                 Some(current) => current.device_id != addr_str,
                                 None => true,
                             };
 
                             if should_update {
-                                *selected = Some(crate::shared_state::PendingDeviceSelection {
-                                    device_id: addr_str.clone(),
-                                    selected_at: chrono::Utc::now(),
-                                });
+                                state.selected_device =
+                                    Some(crate::shared_state::PendingDeviceSelection {
+                                        device_id: addr_str.clone(),
+                                        selected_at: chrono::Utc::now(),
+                                    });
 
                                 log::info!("BLE: selected device from connection: {}", addr_str);
                             }

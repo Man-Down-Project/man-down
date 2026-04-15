@@ -89,15 +89,15 @@ impl Storage {
         Ok(())
     }
 
-    pub fn is_device_allowed(&self, device_id: &str) -> Result<bool> {
+    pub fn edge_tag_exists(&self, rfid_tag: &str) -> Result<bool> {
         let mut stmt = self.conn.prepare(
             "SELECT 1
-            FROM device_whitelist
-            WHERE device_id = ?1 AND active = 1
-            LIMIT 1",
+         FROM device_whitelist
+         WHERE rfid_tag = ?1
+         LIMIT 1",
         )?;
 
-        let mut rows = stmt.query(params![device_id])?;
+        let mut rows = stmt.query(params![rfid_tag])?;
         Ok(rows.next()?.is_some())
     }
 
@@ -113,11 +113,23 @@ impl Storage {
         Ok(rows.next()?.is_some())
     }
 
-    pub fn add_device_to_whitelist(&self, device_id: &str) -> Result<()> {
+    pub fn add_edge_tag_to_whitelist(&self, rfid_tag: &str) -> Result<()> {
         self.conn.execute(
-            "INSERT OR IGNORE INTO device_whitelist (device_id, active)
-             VALUES (?1, 1)",
-            params![device_id],
+            "INSERT OR IGNORE INTO device_whitelist (rfid_tag, mac_address, active)
+         VALUES (?1, NULL, 0)",
+            params![rfid_tag],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn bind_mac_to_edge_tag(&self, rfid_tag: &str, mac_address: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE device_whitelist
+         SET mac_address = ?1,
+             active = 1
+         WHERE rfid_tag = ?2",
+            params![mac_address, rfid_tag],
         )?;
 
         Ok(())
@@ -183,8 +195,9 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
             ON auth_events(worker_id, received_at);
 
         CREATE TABLE IF NOT EXISTS device_whitelist (
-            device_id TEXT PRIMARY KEY,
-            active INTEGER NOT NULL DEFAULT 1
+            rfid_tag TEXT PRIMARY KEY,
+            mac_adress TEXT,
+            active INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS worker_whitelist (

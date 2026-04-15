@@ -2,7 +2,7 @@ use chrono::Utc;
 use tokio::sync::mpsc;
 
 use crate::events::{Envelope, Incident};
-use crate::rfid::models::{RfidAction, RfidScan};
+use crate::rfid::models::{RfidAction, RfidEvent, RfidScan, RfidTagKind, classify_tag};
 use crate::rfid::state::RfidSessionState;
 
 pub fn scan_to_envelope(tag_id: String, scan: RfidScan, seq: u8) -> Envelope {
@@ -25,13 +25,41 @@ pub fn scan_to_envelope(tag_id: String, scan: RfidScan, seq: u8) -> Envelope {
     }
 }
 
-pub async fn run_rfid_service(mut tag_rx: mpsc::Receiver<String>, tx: mpsc::Sender<Envelope>) {
+pub async fn run_rfid_service(
+    mut tag_rx: mpsc::Receiver<String>,
+    tx: mpsc::Sender<Envelope>,
+    edge_event_tx: mpsc::Sender<RfidEvent>,
+) {
     let mut state = RfidSessionState::new();
     let mut seq: u8 = 1;
 
     while let Some(tag_id) = tag_rx.recv().await {
         if tag_id.trim().is_empty() {
             continue;
+        }
+
+        match classify_tag(&tag_id) {
+            RfidTagKind::Unknown => {
+                log::warn!("Unknown RFID tag prefix: {}", tag_id);
+                continue;
+            }
+            RfidTagKind::Worker => {
+                // worker-taggar fortsätter som vanligt
+            }
+            RfidTagKind::Edge => {
+                if let Err(e) = edge_event_tx
+                    .send(RfidEvent::EdgeTag {
+                        tag_id: tag_id.clone(),
+                    })
+                    .await
+                {
+                    log::error!("RFID: failed to send edge tag event: {}", e);
+                    return;
+                }
+
+                log::info!("Edge tag forwarded for provisioning flow: {}", tag_id);
+                continue;
+            }
         }
 
         let action = state.handle_scan(&tag_id);
