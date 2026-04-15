@@ -1,8 +1,4 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-
+use crate::ble::BleEvent;
 use bluer::Session;
 use bluer::adv::{Advertisement, AdvertisementHandle};
 use bluer::agent::Agent;
@@ -11,6 +7,11 @@ use bluer::gatt::local::{
     CharacteristicRead, Service,
 };
 use futures::FutureExt;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use crate::ble::config::PROVISIONING_CHAR_UUID;
@@ -36,6 +37,7 @@ pub async fn start_ble_server(
     stop: tokio::sync::oneshot::Receiver<()>,
     rfid_enabled: Arc<AtomicBool>,
     app_state: Arc<tokio::sync::Mutex<crate::shared_state::AppState>>,
+    ble_event_tx: mpsc::Sender<BleEvent>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("BLE: starting provisioning server");
     rfid_enabled.store(false, Ordering::Relaxed);
@@ -52,6 +54,7 @@ pub async fn start_ble_server(
     // this is supposed to remove the bond data after disconnect
     let adapter_cleanup = adapter.clone();
     let app_state_for_monitor = app_state.clone();
+    let ble_event_tx_for_monitor = ble_event_tx.clone();
 
     tokio::spawn(async move {
         log::info!("BLE: Bond cleanup monitor started");
@@ -64,22 +67,43 @@ pub async fn start_ble_server(
                         let paired = device.is_paired().await.unwrap_or(false);
 
                         if connected {
-                            let mut state = app_state_for_monitor.lock().await;
                             let addr_str = addr.to_string();
 
-                            let should_update = match state.selected_device.as_ref() {
-                                Some(current) => current.device_id != addr_str,
-                                None => true,
-                            };
+                            let mut should_emit_event = false;
 
-                            if should_update {
-                                state.selected_device =
-                                    Some(crate::shared_state::PendingDeviceSelection {
-                                        device_id: addr_str.clone(),
-                                        selected_at: chrono::Utc::now(),
-                                    });
+                            {
+                                let mut state = app_state_for_monitor.lock().await;
 
+                                let should_update = match state.selected_device.as_ref() {
+                                    Some(current) => current.device_id != addr_str,
+                                    None => true,
+                                };
+
+                                if should_update {
+                                    state.selected_device =
+                                        Some(crate::shared_state::PendingDeviceSelection {
+                                            device_id: addr_str.clone(),
+                                            selected_at: chrono::Utc::now(),
+                                        });
+
+                                    should_emit_event = true;
+                                }
+                            }
+
+                            if should_emit_event {
                                 log::info!("BLE: selected device from connection: {}", addr_str);
+
+                                if let Err(e) = ble_event_tx_for_monitor
+                                    .send(BleEvent::DeviceConnected {
+                                        mac_address: addr_str.clone(),
+                                    })
+                                    .await
+                                {
+                                    log::error!(
+                                        "BLE: failed to send device-connected event: {}",
+                                        e
+                                    );
+                                }
                             }
 
                             // If the device is still in the system as "paired" but the
