@@ -196,7 +196,7 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
 
         CREATE TABLE IF NOT EXISTS device_whitelist (
             rfid_tag TEXT PRIMARY KEY,
-            mac_adress TEXT,
+            mac TEXT,
             active INTEGER NOT NULL DEFAULT 0
         );
 
