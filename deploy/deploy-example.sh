@@ -29,7 +29,7 @@ if [ ! -f "$GEN_CERTS_SCRIPT" ]; then
 fi
 
 chmod +x "$GEN_CERTS_SCRIPT"
-bash "$GEN_CERTS_SCRIPT" "$PI_IP" "$WIFI_SSID" "$WIFI_PASS" "$DEVICE_ID" "$MQTT_PASS"
+bash "$GEN_CERTS_SCRIPT" "$PI_IP" "$WIFI_SSID" "$WIFI_PASS" "$DEVICE_ID" "$MQTT_PASS" "$MQTT_PORT"
 
 echo "🛠️  Step 1: Local Cross-Compilation (Rust)..."
 cd "$FOG_DIR"
