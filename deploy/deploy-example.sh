@@ -13,7 +13,6 @@ MQTT_PORT="8883"
 DEVICE_ID="2"
 MQTT_PASS="dev"
 
-
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$DEPLOY_DIR/.." && pwd)"
 FOG_DIR="$ROOT_DIR/fog"
