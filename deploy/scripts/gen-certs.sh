@@ -84,8 +84,7 @@ echo "Done! Hope the certs work well for you..."
 
 # 9. Read contents into variables (Avoids shell issues inside the file-write)
 CA_CONTENT=$(cat ca.crt)
-MESH_CRT_CONTENT=$(cat mesh-client.crt)
-MESH_KEY_CONTENT=$(cat mesh-client.key)
+
 FOG_CA_CONTENT=$(cat fog-ca.crt)
 
 # 10. Write Arduino Header
