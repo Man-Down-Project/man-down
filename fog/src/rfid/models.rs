@@ -32,6 +32,8 @@ pub fn classify_tag(tag_id: &str) -> RfidTagKind {
         RfidTagKind::Edge
     } else if trimmed.starts_with('4') {
         RfidTagKind::Worker
+    }else if trimmed.starts_with('5') {
+        RfidTagKind::Edge
     } else {
         RfidTagKind::Unknown
     }
