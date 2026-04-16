@@ -13,6 +13,8 @@
 #include "storage/auth_store.h"
 #include "freertos/FreeRTOS.h"
 
+#include "wifi_ble/provision.h"
+
 static const char *TAG = "[AUTH]";
 
 uint8_t shared_key[KEY_LEN] = {
@@ -20,22 +22,38 @@ uint8_t shared_key[KEY_LEN] = {
     0x4F, 0xFE, 0xF2, 0xEF, 0x96, 0x01, 0xB1, 0x4F
 };
 
-bool auth_load_key(uint8_t *out_key, size_t *out_len) {
-    nvs_handle_t handle;
-    *out_len = KEY_LEN; 
-
-    if (nvs_open("auth", NVS_READONLY, &handle) != ESP_OK) {
+bool auth_load_key(uint8_t *out_key, size_t *out_len)
+{
+    if (!out_key || !out_len) {
+        ESP_LOGE(TAG, "Invalid arguments to auth_load_key");
         return false;
     }
-    
-    esp_err_t err = nvs_get_blob(handle, "hmac_secret", out_key, out_len);
-    nvs_close(handle);
-    
+
+    nvs_handle_t handle;
+    *out_len = KEY_LEN;
+
+    esp_err_t err = nvs_open("auth", NVS_READONLY, &handle);
     if (err != ESP_OK) {
-        ESP_LOGD(TAG, "NVS Key not found or error: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "Failed to open NVS: %s", esp_err_to_name(err));
+        return false;
     }
-    
-    return (err == ESP_OK && *out_len == KEY_LEN);
+
+    err = nvs_get_blob(handle, "hmac_secret", out_key, out_len);
+    nvs_close(handle);
+
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "HMAC key not found in NVS: %s", esp_err_to_name(err));
+        secure_memzero(out_key, KEY_LEN);
+        return false;
+    }
+
+    if (*out_len != KEY_LEN) {
+        ESP_LOGE(TAG, "Invalid key length: %d (expected %d)", (int)*out_len, KEY_LEN);
+        secure_memzero(out_key, KEY_LEN);
+        return false;
+    }
+
+    return true;
 }
 
 void auth_store_key(const uint8_t *key, size_t len) {
@@ -65,6 +83,7 @@ void auth_store_key(const uint8_t *key, size_t len) {
 }
 
 bool verify_edge_message(uint8_t *data, size_t data_len) {
+    
     if (!data || data_len != sizeof(edge_event_t)) {
         ESP_LOGE(TAG, "Invalid input length: %d (expected %zu)",
                  (int)data_len, sizeof(edge_event_t));
@@ -76,14 +95,11 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
     uint8_t active_key[KEY_LEN];
     size_t key_len = KEY_LEN; 
 
-    bool has_provisioned_key = auth_load_key(active_key, &key_len);
-
-    if (has_provisioned_key) 
+    if (!auth_load_key(active_key, &key_len))
     {
-        ESP_LOGI(TAG, "Using provisioned key");
-    } else {
-        ESP_LOGW(TAG, "No provisioned key, using fallback");
-        memcpy(active_key, shared_key, KEY_LEN);
+        ESP_LOGE(TAG, "No key provisioned! rejecting message.");
+        secure_memzero(active_key, sizeof(active_key));
+        return false;
     }
 
     uint8_t buffer[sizeof(edge_event_t)];
@@ -112,13 +128,22 @@ bool verify_edge_message(uint8_t *data, size_t data_len) {
     mbedtls_md_hmac_finish(&ctx, calculated_hash);
     mbedtls_md_free(&ctx);
 
+    bool result;
+
     if (memcmp(calculated_hash, received_tag, AUTH_TAG_LEN) == 0) {
         ESP_LOGI(TAG, "HMAC Verified");
-        return true;
+        result = true;
     } else {
         ESP_LOGE(TAG, "HMAC Mismatch");
-        return false;
+        result = false;
     }
+
+    secure_memzero(active_key, sizeof(active_key));
+    secure_memzero(calculated_hash, sizeof(calculated_hash));
+    secure_memzero(buffer, sizeof(buffer));
+    secure_memzero(received_tag, sizeof(received_tag));
+
+    return result;
 }
 
 void generate_auth_tag(uint8_t *data, size_t data_len, uint8_t *auth_tag)
@@ -141,4 +166,7 @@ void generate_auth_tag(uint8_t *data, size_t data_len, uint8_t *auth_tag)
     mbedtls_md_hmac_finish(&ctx, calculated_hash);
     memcpy(auth_tag, calculated_hash, AUTH_TAG_LEN);
     mbedtls_md_free(&ctx);
+
+    secure_memzero(active_key, sizeof(active_key));
+    secure_memzero(calculated_hash, sizeof(calculated_hash));
 }

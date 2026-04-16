@@ -3,11 +3,14 @@
 #include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "nvs_flash.h"
 
 #include "storage/auth_store.h"
 #include "security/auth.h"
 
 static const char *TAG = "[PROVISIONING]";
+
+void secure_memzero(void *v, size_t n);
 
 bool hexStringToByte(const char* str, uint8_t* out, size_t outLen)
 {
@@ -24,7 +27,6 @@ bool hexStringToByte(const char* str, uint8_t* out, size_t outLen)
 
 void handle_provision(uint8_t *data, int len)
 {
-    
     if (len != 40) {
         ESP_LOGE(TAG, "Invalid HMAC payload length: %d", len);
         return;
@@ -57,8 +59,16 @@ void handle_provision(uint8_t *data, int len)
     
     bool has_key = auth_load_key(existing_key, &existing_len);
 
-    if (has_key && memcmp(incoming_key, existing_key, 16) == 0) {
-        ESP_LOGI(TAG, "Provisioning match: Key is already up to date. Skipping store/reboot.");
+    if (has_key && memcmp(incoming_key, existing_key, 16) == 0) 
+    {
+        ESP_LOGI(TAG, "Provisioning match: Key already up to date");
+
+        secure_memzero(incoming_key, sizeof(incoming_key));
+        secure_memzero(existing_key, sizeof(existing_key));
+        secure_memzero(buffer, sizeof(buffer));
+        secure_memzero(keyStr, sizeof(keyStr));
+        secure_memzero(tsStr, sizeof(tsStr));
+
         return;
     }
 
@@ -66,8 +76,43 @@ void handle_provision(uint8_t *data, int len)
    
     auth_store_key(incoming_key, 16);
 
+    secure_memzero(existing_key, sizeof(existing_key));
+    
+    nvs_handle_t nvs;
+    if (nvs_open("config", NVS_READWRITE, &nvs) == ESP_OK) {
+        nvs_set_u8(nvs, "prov", 1);
+        nvs_commit(nvs);
+        nvs_close(nvs);
+    }
+
+    secure_memzero(incoming_key, sizeof(incoming_key));
+    secure_memzero(buffer, sizeof(buffer));
+    secure_memzero(keyStr, sizeof(keyStr));
+    secure_memzero(tsStr, sizeof(tsStr));
+
     ESP_LOGI(TAG, "HMAC key stored successfully. Rebooting...");
 
     vTaskDelay(pdMS_TO_TICKS(1000));
     esp_restart();
+}
+
+void secure_memzero(void *v, size_t n)
+{
+    volatile uint8_t *p = v;
+    while (n--) *p++ = 0;
+}
+
+bool is_provisioned() 
+{
+    nvs_handle_t nvs;
+
+    if (nvs_open("config", NVS_READONLY, &nvs) != ESP_OK)
+        return false;
+
+    uint8_t flag = 0;
+    esp_err_t err = nvs_get_u8(nvs, "prov", &flag);
+
+    nvs_close(nvs);
+
+    return (err == ESP_OK && flag == 1);
 }
