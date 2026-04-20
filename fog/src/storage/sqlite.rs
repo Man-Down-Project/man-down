@@ -31,6 +31,7 @@ impl Storage {
             serde_json::to_string(&env.incident).map_err(|_| rusqlite::Error::InvalidQuery)?;
 
         let event_type = event_type(&env.incident);
+        let device_id = mac_to_string(&env.device_id);
 
         self.conn.execute(
             "INSERT OR IGNORE INTO events (
@@ -44,7 +45,7 @@ impl Storage {
         )
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
-                &env.device_id,
+                device_id,
                 &env.mesh_node_id,
                 env.seq,
                 env.mesh_timestamp,
@@ -63,6 +64,7 @@ impl Storage {
             Incident::Logout { worker_id } => (worker_id, "logout"),
             _ => return Ok(()),
         };
+        let device_id = mac_to_string(&env.device_id);
 
         self.conn.execute(
             "INSERT OR IGNORE INTO auth_events (
@@ -76,7 +78,7 @@ impl Storage {
         )
         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
-                &env.device_id,
+                device_id,
                 worker_id,
                 action,
                 &env.mesh_node_id,
@@ -234,4 +236,12 @@ fn event_type(incident: &Incident) -> &'static str {
         Incident::BatteryLow { .. } => "battery_low",
         Incident::SensorFault { .. } => "sensor_fault",
     }
+}
+
+fn mac_to_string(mac: &[u8; 6]) -> String {
+    format!(
+        "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+        mac[0], mac[1], mac[2],
+        mac[3], mac[4], mac[5]
+    )
 }
