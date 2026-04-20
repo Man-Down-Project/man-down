@@ -31,7 +31,7 @@ impl Storage {
             serde_json::to_string(&env.incident).map_err(|_| rusqlite::Error::InvalidQuery)?;
 
         let event_type = event_type(&env.incident);
-        let device_id = mac_to_string(&env.device_id);
+        let device_id = mac_to_string(&env.device_id[..]);
 
         self.conn.execute(
             "INSERT OR IGNORE INTO events (
@@ -64,7 +64,7 @@ impl Storage {
             Incident::Logout { worker_id } => (worker_id, "logout"),
             _ => return Ok(()),
         };
-        let device_id = mac_to_string(&env.device_id);
+        let device_id = mac_to_string(&env.device_id[..]);
 
         self.conn.execute(
             "INSERT OR IGNORE INTO auth_events (
