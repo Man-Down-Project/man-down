@@ -326,20 +326,20 @@ async fn run_processor(
                     _ => {}
                 }
 
-                match storage.edge_tag_exists(&env.device_id) {
+                match storage.is_device_mac_allowed(&env.device_id) {
                     Ok(true) => {}
                     Ok(false) => {
-                        log::warn!(
-                            "Dropped event from non-whitelisted device: {}",
-                            env.device_id
-                        );
-                        continue;
-                    }
-                    Err(e) => {
-                        log::error!("Failed to check device whitelist: {}", e);
-                        continue;
-                    }
+                    log::warn!(
+                        "Dropped event from non-whitelisted device: {}",
+                        env.device_id
+                    );
+                    continue;
                 }
+                Err(e) => {
+                    log::error!("Failed to check device MAC whitelist: {}", e);
+                    continue;
+                }
+            }
 
                 if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &env.incident {
                     match storage.is_worker_allowed(worker_id) {
