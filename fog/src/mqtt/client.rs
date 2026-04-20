@@ -151,7 +151,7 @@ async fn handle_event(
                 publish.payload.len()
             );
 
-            const EDGE_EVENT_LEN: usize = 7;
+            const EDGE_EVENT_LEN: usize = EdgeEvent::LEN;
             const HMAC_LEN: usize = 8;
             const SIGNED_LEN: usize = EDGE_EVENT_LEN + HMAC_LEN;
 

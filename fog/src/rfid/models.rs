@@ -1,5 +1,3 @@
-// Models reserved for future real RFID integration (hardware input)
-
 #[derive(Debug, Clone)]
 pub enum RfidAction {
     Login,
@@ -32,7 +30,7 @@ pub fn classify_tag(tag_id: &str) -> RfidTagKind {
         RfidTagKind::Edge
     } else if trimmed.starts_with('4') {
         RfidTagKind::Worker
-    }else if trimmed.starts_with('5') {
+    } else if trimmed.starts_with('5') {
         RfidTagKind::Edge
     } else {
         RfidTagKind::Unknown
