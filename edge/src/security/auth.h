@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include "config/edge_config.h"
 typedef struct __attribute__((packed)) {
-    uint8_t device_id;
+    uint8_t device_id[6];
     uint8_t event_type;
     uint8_t event_location;
     uint8_t battery_status;

@@ -49,7 +49,7 @@
 #define BATTERY_STATUS  94
 //Seq uppdateras automatiskt i heartbeat packets
 typedef struct __attribute__((packed)){ // external comunication
-    uint8_t device_id;
+    uint8_t device_id[6];
     uint8_t event_type;
     uint8_t event_location;
     uint8_t battery_status;
