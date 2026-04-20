@@ -238,7 +238,7 @@ fn event_type(incident: &Incident) -> &'static str {
     }
 }
 
-fn mac_to_string(mac: &[u8; 6]) -> String {
+fn mac_to_string(mac: &[u8]) -> String {
     if mac.len() != 6 {
         return "INVALID_MAC".to_string();
     }
