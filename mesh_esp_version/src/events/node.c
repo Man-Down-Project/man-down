@@ -6,6 +6,8 @@
 #include "esp_wifi.h"
 #include "mqtt_client.h"
 #include <time.h>
+#include "esp_mac.h"
+#include "esp_system.h"
 
 #include "wifi_ble/ble.h"
 #include "wifi_ble/wifi.h"
@@ -31,6 +33,16 @@ static void node_task(void*arg)
         vTaskDelete(NULL);
         return;
     }
+
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+
+    char mac_str[18];
+    snprintf(mac_str, sizeof(mac_str),
+             "%02X:%02X:%02X:%02X:%02X:%02X",
+             mac[0], mac[1], mac[2],
+             mac[3], mac[4], mac[5]);
+
     while(1)
     {
         if (xQueueReceive(ble_queue, &incomming, portMAX_DELAY))
@@ -44,7 +56,7 @@ static void node_task(void*arg)
             }
             ESP_LOGI(TAG, "Processing event from device %d", incomming.device_id);
 
-            outgoing.device_id = incomming.device_id;
+            strncpy(outgoing.device_id, mac_str, sizeof(outgoing.device_id));
             outgoing.event_type = incomming.event_type;
             outgoing.battery = incomming.battery_status;
             outgoing.seq = incomming.seq;
