@@ -11,10 +11,10 @@
 
 void edge_trigger_event(uint8_t event_type, uint8_t battery)
 {
-    edge_event_t event;
+    edge_event_t event = {0};
 
     uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_BT);
+    esp_read_mac(mac, ESP_MAC_BASE);
 
     memcpy(event.device_id, mac, 6);
     event.event_type = event_type;

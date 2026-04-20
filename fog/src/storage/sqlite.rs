@@ -115,7 +115,7 @@ impl Storage {
 
     pub fn add_edge_tag_to_whitelist(&self, rfid_tag: &str) -> Result<()> {
         self.conn.execute(
-            "INSERT OR IGNORE INTO device_whitelist (rfid_tag, mac_address, active)
+            "INSERT OR IGNORE INTO device_whitelist (rfid_tag, mac, active)
          VALUES (?1, NULL, 0)",
             params![rfid_tag],
         )?;

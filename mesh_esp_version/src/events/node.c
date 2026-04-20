@@ -33,27 +33,27 @@ static void node_task(void*arg)
         vTaskDelete(NULL);
         return;
     }
-    char mac_log[18];
-    snprintf(mac_log, sizeof(mac_log),
-            "%02X:%02X:%02X:%02X:%02X:%02X",
-            incomming.device_id[0], incomming.device_id[1],
-            incomming.device_id[2], incomming.device_id[3],
-            incomming.device_id[4], incomming.device_id[5]);
-
-    ESP_LOGI(TAG, "Processing event from device %s", mac_log);
+    
 
     while(1)
     {
         if (xQueueReceive(ble_queue, &incomming, portMAX_DELAY))
         {
-            
+            char mac_log[18];
+            snprintf(mac_log, sizeof(mac_log),
+                    "%02X:%02X:%02X:%02X:%02X:%02X",
+                    incomming.device_id[0], incomming.device_id[1],
+                    incomming.device_id[2], incomming.device_id[3],
+                    incomming.device_id[4], incomming.device_id[5]);
+
+            ESP_LOGI(TAG, "Processing event from device %s", mac_log);
             if (!verify_edge_message((uint8_t*)&incomming, sizeof(edge_event_t)))
             {
-                ESP_LOGW(TAG, "Auth failed for device %s! Rejecting.", outgoing.device_id);
+                ESP_LOGW(TAG, "Auth failed for device %s! Rejecting.", mac_log);
                 send_ble_nack(incomming.seq);
                 continue;
             }
-            ESP_LOGI(TAG, "Processing event from device %s", outgoing.device_id);
+            ESP_LOGI(TAG, "Processing event from device %s", mac_log);
 
             memcpy(outgoing.device_id, incomming.device_id, 6);
             outgoing.event_type = incomming.event_type;
@@ -82,13 +82,13 @@ static void node_task(void*arg)
                 case 0: 
                 {
                     ESP_LOGI(TAG, "Heartbeat from device %s (batt: %d%%)",
-                             outgoing.device_id, outgoing.battery);
+                             mac_log, outgoing.battery);
                     break;
                 }
                 case 1:
                 {
                     ESP_LOGI(TAG, "Fall detected! device %s @location: %d time of event: %d", 
-                        outgoing.device_id,
+                        mac_log,
                         outgoing.location,
                         outgoing.timestamp);
                     break;
@@ -96,7 +96,7 @@ static void node_task(void*arg)
                 case 2:
                 {
                     ESP_LOGI(TAG, "Gas detected! device %s @location: %d time of event: %d",
-                        outgoing.device_id,
+                        mac_log,
                         outgoing.location,
                         outgoing.timestamp);
                     break;;
