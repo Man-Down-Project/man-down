@@ -239,6 +239,10 @@ fn event_type(incident: &Incident) -> &'static str {
 }
 
 fn mac_to_string(mac: &[u8; 6]) -> String {
+    if mac.len() != 6 {
+        return "INVALID_MAC".to_string();
+    }
+    
     format!(
         "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
         mac[0], mac[1], mac[2],
