@@ -33,15 +33,14 @@ static void node_task(void*arg)
         vTaskDelete(NULL);
         return;
     }
+    char mac_log[18];
+    snprintf(mac_log, sizeof(mac_log),
+            "%02X:%02X:%02X:%02X:%02X:%02X",
+            incomming.device_id[0], incomming.device_id[1],
+            incomming.device_id[2], incomming.device_id[3],
+            incomming.device_id[4], incomming.device_id[5]);
 
-    uint8_t mac[6];
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-
-    char mac_str[18];
-    snprintf(mac_str, sizeof(mac_str),
-             "%02X:%02X:%02X:%02X:%02X:%02X",
-             mac[0], mac[1], mac[2],
-             mac[3], mac[4], mac[5]);
+    ESP_LOGI(TAG, "Processing event from device %s", mac_log);
 
     while(1)
     {
@@ -50,13 +49,13 @@ static void node_task(void*arg)
             
             if (!verify_edge_message((uint8_t*)&incomming, sizeof(edge_event_t)))
             {
-                ESP_LOGW(TAG, "Auth failed for device %s! Rejecting.", mac_str);
+                ESP_LOGW(TAG, "Auth failed for device %s! Rejecting.", outgoing.device_id);
                 send_ble_nack(incomming.seq);
                 continue;
             }
-            ESP_LOGI(TAG, "Processing event from device %s", mac_str);
+            ESP_LOGI(TAG, "Processing event from device %s", outgoing.device_id);
 
-            memcpy(outgoing.device_id, mac, sizeof(outgoing.device_id));
+            memcpy(outgoing.device_id, incomming.device_id, 6);
             outgoing.event_type = incomming.event_type;
             outgoing.battery = incomming.battery_status;
             outgoing.seq = incomming.seq;
@@ -83,13 +82,13 @@ static void node_task(void*arg)
                 case 0: 
                 {
                     ESP_LOGI(TAG, "Heartbeat from device %s (batt: %d%%)",
-                             mac_str, outgoing.battery);
+                             outgoing.device_id, outgoing.battery);
                     break;
                 }
                 case 1:
                 {
                     ESP_LOGI(TAG, "Fall detected! device %s @location: %d time of event: %d", 
-                        mac_str,
+                        outgoing.device_id,
                         outgoing.location,
                         outgoing.timestamp);
                     break;
@@ -97,7 +96,7 @@ static void node_task(void*arg)
                 case 2:
                 {
                     ESP_LOGI(TAG, "Gas detected! device %s @location: %d time of event: %d",
-                        mac_str,
+                        outgoing.device_id,
                         outgoing.location,
                         outgoing.timestamp);
                     break;;
