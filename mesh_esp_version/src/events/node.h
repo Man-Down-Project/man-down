@@ -9,7 +9,7 @@
 #define CMD_DISCONNECT 0xFE
 
 typedef struct __attribute__((packed)) {
-    char device_id[18];
+    char device_id[6];
     uint8_t event_type;
     uint8_t event_location;
     uint8_t battery_status;
@@ -18,7 +18,7 @@ typedef struct __attribute__((packed)) {
 } edge_event_t;
 
 typedef struct __attribute__((packed)) {
-    char device_id[18];
+    char device_id[6];
     uint8_t event_type;
     uint8_t location;
     uint8_t battery;

@@ -50,13 +50,13 @@ static void node_task(void*arg)
             
             if (!verify_edge_message((uint8_t*)&incomming, sizeof(edge_event_t)))
             {
-                ESP_LOGW(TAG, "Auth failed for device %d! Rejecting.", incomming.device_id);
+                ESP_LOGW(TAG, "Auth failed for device %s! Rejecting.", mac_str);
                 send_ble_nack(incomming.seq);
                 continue;
             }
-            ESP_LOGI(TAG, "Processing event from device %d", incomming.device_id);
+            ESP_LOGI(TAG, "Processing event from device %s", mac_str);
 
-            strncpy(outgoing.device_id, mac_str, sizeof(outgoing.device_id));
+            memcpy(outgoing.device_id, mac, sizeof(outgoing.device_id));
             outgoing.event_type = incomming.event_type;
             outgoing.battery = incomming.battery_status;
             outgoing.seq = incomming.seq;
@@ -82,22 +82,22 @@ static void node_task(void*arg)
             {
                 case 0: 
                 {
-                    ESP_LOGI(TAG, "Heartbeat from device %d (batt: %d%%)",
-                             outgoing.device_id, outgoing.battery);
+                    ESP_LOGI(TAG, "Heartbeat from device %s (batt: %d%%)",
+                             mac_str, outgoing.battery);
                     break;
                 }
                 case 1:
                 {
-                    ESP_LOGI(TAG, "Fall detected! device %d @location: %d time of event: %d", 
-                        outgoing.device_id,
+                    ESP_LOGI(TAG, "Fall detected! device %s @location: %d time of event: %d", 
+                        mac_str,
                         outgoing.location,
                         outgoing.timestamp);
                     break;
                 }
                 case 2:
                 {
-                    ESP_LOGI(TAG, "Gas detected! device %d @location: %d time of event: %d",
-                        outgoing.device_id,
+                    ESP_LOGI(TAG, "Gas detected! device %s @location: %d time of event: %d",
+                        mac_str,
                         outgoing.location,
                         outgoing.timestamp);
                     break;;
