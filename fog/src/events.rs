@@ -144,7 +144,7 @@ pub struct SignedEdgeEvent {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct EdgeEvent {
-    pub device_id: u8,
+    pub device_id: [u8; 6],
     pub event_type: u8,
     pub location: u8,
     pub battery: u8,
@@ -154,30 +154,36 @@ pub struct EdgeEvent {
 
 impl EdgeEvent {
     #[allow(dead_code)]
-    pub const LEN: usize = 7;
+    pub const LEN: usize = 12;
 
     pub fn from_bytes(b: &[u8]) -> Option<Self> {
         if b.len() != Self::LEN {
             return None;
         }
-
-        let ts_bytes: [u8; 2] = b[5..7].try_into().ok()?;
+        let device_id: [u8; 6] = b[0..6].try_into().ok()?;
+    
+        let ts_bytes: [u8; 2] = b[10..12].try_into().ok()?;
         let time_stamp = u16::from_le_bytes(ts_bytes);
 
         Some(Self {
-            device_id: b[0],
-            event_type: b[1],
-            location: b[2],
-            battery: b[3],
-            seq: b[4],
+            device_id,
+            event_type: b[6],
+            location: b[7],
+            battery: b[8],
+            seq: b[9],
             time_stamp,
         })
     }
 
-    pub fn to_bytes(&self) -> [u8; 7] {
+    pub fn to_bytes(&self) -> [u8; 12] {
         let ts = self.time_stamp.to_le_bytes();
         [
-            self.device_id,
+            self.device_id[0],
+            self.device_id[1],
+            self.device_id[2],
+            self.device_id[3],
+            self.device_id[4],
+            self.device_id[5],
             self.event_type,
             self.location,
             self.battery,
@@ -194,9 +200,19 @@ impl EdgeEvent {
     pub fn heartbeat_log_line(&self, mesh_node_id: &str, received_at: DateTime<Utc>) -> String {
         let stockholm_time = received_at.with_timezone(&Stockholm);
 
+        let mac = format!(
+            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            self.device_id[0],
+            self.device_id[1],
+            self.device_id[2],
+            self.device_id[3],
+            self.device_id[4],
+            self.device_id[5],
+        );
+
         format!(
-            r#"{{"type":"heartbeat","device_id":{},"mesh_node_id":"{}","seq":{},"mesh_timestamp":{},"battery_level":{},"received_at":"{}"}}"#,
-            self.device_id,
+            r#"{{"type":"heartbeat","device_id":"{}","mesh_node_id":"{}","seq":{},"mesh_timestamp":{},"battery_level":{},"received_at":"{}"}}"#,
+            mac,
             mesh_node_id,
             self.seq,
             self.time_stamp,
@@ -206,7 +222,15 @@ impl EdgeEvent {
     }
 
     pub fn to_envelope(self, mesh_node_id: String) -> Envelope {
-        let device_id = self.device_id.to_string();
+        let device_id = format!(
+            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            self.device_id[0],
+            self.device_id[1],
+            self.device_id[2],
+            self.device_id[3],
+            self.device_id[4],
+            self.device_id[5],
+        );
 
         let incident = match self.event_type {
             0x01 => Incident::ManDown {
