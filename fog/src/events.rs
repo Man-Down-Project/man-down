@@ -161,7 +161,6 @@ impl EdgeEvent {
             return None;
         }
         let device_id: [u8; 6] = b[0..6].try_into().ok()?;
-    
         let ts_bytes: [u8; 2] = b[10..12].try_into().ok()?;
         let time_stamp = u16::from_le_bytes(ts_bytes);
 

@@ -305,23 +305,39 @@ async fn run_processor(
 
                 match &env.incident {
                     Incident::Login { .. } | Incident::Logout { .. } => {
-                        let mut state = app_state.lock().await;
+                        // Om device_id redan kom in från edge som MAC, använd den.
+                        let device_id_looks_like_mac = !env.device_id.trim().is_empty()
+                            && env.device_id.len() <= 17
+                            && env.device_id
+                                .chars()
+                                .all(|c| c.is_ascii_hexdigit() || c == ':');
 
-                        let Some(device) = state.selected_device.as_ref() else {
-                            log::warn!("No selected device for auth event");
-                            continue;
-                        };
+                        if !device_id_looks_like_mac {
+                            let mut state = app_state.lock().await;
 
-                        if Utc::now().signed_duration_since(device.selected_at)
-                            > chrono::Duration::seconds(10)
-                        {
-                            log::warn!("Selected device expired");
+                            let Some(device) = state.selected_device.as_ref() else {
+                                log::warn!(
+                                    "No selected device for auth event, and envelope had no valid device_id"
+                                );
+                                continue;
+                            };
+
+                            if Utc::now().signed_duration_since(device.selected_at)
+                                > chrono::Duration::seconds(10)
+                            {
+                                log::warn!("Selected device expired");
+                                state.selected_device = None;
+                                continue;
+                            }
+
+                            env.device_id = device.device_id.clone();
                             state.selected_device = None;
-                            continue;
+                        } else {
+                            log::debug!(
+                                "Auth event already contains device_id from edge: {}",
+                                env.device_id
+                            );
                         }
-
-                        env.device_id = device.device_id.clone();
-                        state.selected_device = None;
                     }
                     _ => {}
                 }
