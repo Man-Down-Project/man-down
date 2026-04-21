@@ -69,17 +69,16 @@ pub async fn run_rfid_service(
             RfidAction::Logout => "logout",
         };
 
+        let worker_id = tag_id.clone();
+
         log::info!(
             "RFID EVENT: action={} tag={} worker={}",
             action_str,
             tag_id,
-            "worker-01"
+            worker_id
         );
 
-        let scan = RfidScan {
-            worker_id: "worker-01".to_string(),
-            action,
-        };
+        let scan = RfidScan { worker_id, action };
 
         let worker_id = scan.worker_id.clone();
 

@@ -309,6 +309,12 @@ async fn run_processor(
 
                                         let mut state = app_state.lock().await;
                                         state.pending_edge_tag = None;
+                                        state.selected_device = Some(crate::shared_state::PendingDeviceSelection {
+                                            device_id: mac_address.clone(),
+                                            selected_at: Utc::now(),
+                                        });
+
+                                        log::info!("Current device set from BLE connection: {}", mac_address);
                                     }
                                     Err(e) => {
                                         log::error!(

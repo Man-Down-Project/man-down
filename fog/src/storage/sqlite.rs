@@ -263,14 +263,3 @@ fn event_type(incident: &Incident) -> &'static str {
         Incident::SensorFault { .. } => "sensor_fault",
     }
 }
-
-fn mac_to_string(mac: &[u8]) -> String {
-    if mac.len() != 6 {
-        return "INVALID_MAC".to_string();
-    }
-
-    format!(
-        "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]
-    )
-}
