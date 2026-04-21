@@ -306,12 +306,11 @@ async fn run_processor(
 
                 match &env.incident {
                     Incident::Login { .. } | Incident::Logout { .. } => {
-                        // Om device_id redan kom in från edge som MAC, använd den.
-                        let device_id_looks_like_mac = !env.device_id.trim().is_empty()
-                            && env.device_id.len() <= 17
-                            && env.device_id
-                                .chars()
-                                .all(|c| c.is_ascii_hexdigit() || c == ':');
+                        let parts: Vec<&str> = env.device_id.split(':').collect();
+                        let device_id_looks_like_mac = parts.len() == 6
+                            && parts.iter().all(|part| {
+                                part.len() == 2 && part.chars().all(|c| c.is_ascii_hexdigit())
+                            });
 
                         if !device_id_looks_like_mac {
                             let mut state = app_state.lock().await;
