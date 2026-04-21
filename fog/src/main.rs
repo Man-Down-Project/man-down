@@ -21,6 +21,7 @@ use crate::rfid::service::run_rfid_service;
 use crate::shared_state::AppState;
 use crate::storage::Storage;
 use chrono::Utc;
+use tokio_rustls::rustls::internal::msgs::base::Payload;
 use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -120,6 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         rfid_enabled.clone(),
         app_state.clone(),
         ble_event_tx.clone(),
+        outgoing_tx.clone(),
     );
 
     tokio::select! {
@@ -144,6 +146,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
+async fn publish_active_macs(
+    storage: &Storage,
+    outgoing_tx: &mpsc::Sender<OutgoingMessage>,
+){
+    match storage.get_active_macs() {
+        Ok(macs) =>{
+            let formatted: Vec<String> = macs
+            .into_iter()
+            .map(|m| m.replace(":", "").to_uppercase())
+            .collect();
+            
+            let payload = formatted.join(",");
+
+            let msg = OutgoingMessage {
+                topic: "mesh/provisioning/edgeid".to_string(),
+                payload: payload.clone(),
+            };
+
+            if let Err(e) = outgoing_tx.send(msg).await {
+                log::error!("Failed to publish whitelist: {}", e);
+            }else{
+                log::info!("Published whitelist: {}", payload);
+            }
+        }
+        Err(e) => {
+            log::error!("Failed ro fetch Macs: {}", e);
+        }
+    }
+}
+
 async fn publish_initial_provisioning(
     outgoing_tx: &mpsc::Sender<OutgoingMessage>,
     state: &ProvisioningState,
@@ -166,6 +198,7 @@ async fn run_processor(
     rfid_enabled: Arc<AtomicBool>,
     app_state: Arc<Mutex<AppState>>,
     ble_event_tx: mpsc::Sender<crate::ble::BleEvent>,
+    outgoing_tx: mpsc::Sender<OutgoingMessage>,
 ) {
     loop {
         tokio::select! {
@@ -272,6 +305,7 @@ async fn run_processor(
                                             mac_address,
                                             edge_tag.rfid_tag
                                         );
+                                        publish_active_macs(&storage, &outgoing_tx).await;
 
                                         let mut state = app_state.lock().await;
                                         state.pending_edge_tag = None;

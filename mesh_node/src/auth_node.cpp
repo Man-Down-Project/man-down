@@ -40,7 +40,13 @@ void AuthNode::begin(uint8_t node_id) {
     _node_id = node_id;
 
     loadAuthorizedEdges();
+    /*
+    Serial.print("MAGIC: ");
+    Serial.println(_ram_auth.magic, HEX);
 
+    Serial.print("VERSION: ");
+    Serial.println(_ram_auth.version, HEX);
+    */
     if(isStorageEmpty()){
         Serial.println("Storage is empty.. Attempting provisioning...");
         //maby force a frist provisioning from mqtt topic here?
@@ -116,6 +122,7 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
 
     memcpy(computed_tag, full_hash, AUTH_TAG_LEN);
 
+    /*
     Serial.println("---- AUTH DEBUG ----");
     Serial.print("Received tag: ");
     for (int i = 0; i < AUTH_TAG_LEN; i++) {
@@ -133,6 +140,7 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
     }
     Serial.println();
     Serial.println("--------------------");
+    */
     // compare computed HMAC with received auth_tag
     if (!constTimeComp(pkt->auth_tag, computed_tag, AUTH_TAG_LEN)) {
 
@@ -176,10 +184,16 @@ bool AuthNode::validateEdge(edge_event_t* pkt) {
     return true;
 }
 
+bool isEmpty(const uint8_t mac[MAC_LEN]) {
+    for(int i = 0; i < MAC_LEN; i++){
+        if(mac[i] != EMPTY_ID) return false; 
+    }
+    return true;
+}
 
 bool AuthNode::addDeviceToWhitelist(const uint8_t mac[MAC_LEN]){
     for(int i = 0; i < MAX_APPROVED_EDGE; i++){
-        if(_ram_auth.device_whitelist[i][0] == EMPTY_ID){
+        if(isEmpty(_ram_auth.device_whitelist[i])){
             memcpy(_ram_auth.device_whitelist[i], mac, MAC_LEN);
             return true;
         }
@@ -265,6 +279,22 @@ void AuthNode::commitWhitelistIfChange(const uint8_t provisionedList[][MAC_LEN],
     uint8_t addList[MAX_APPROVED_EDGE][MAC_LEN];
     uint8_t removeList[MAX_APPROVED_EDGE][MAC_LEN];
 
+    /*
+    Serial.print("provCount = ");
+    Serial.println(provCount);
+
+    for(int i = 0; i < provCount; i++){
+        Serial.print("Provisioned[");
+        Serial.print(i);
+        Serial.print("]: ");
+
+    for(int j = 0; j < MAC_LEN; j++){
+        Serial.print(provisionedList[i][j], HEX);
+        Serial.print(" ");
+    }
+    Serial.println();
+    }
+    */
     int curentCount = countWhitelist();
 
     int addCount = whitelistCompare(provisionedList, provCount, _ram_auth.device_whitelist, curentCount, addList);

@@ -157,7 +157,21 @@ impl Storage {
         )?;
         Ok(())
     }
+
+    pub fn get_active_macs(&self) -> Result<Vec<String>> {
+    let mut stmt = self.conn.prepare(
+        "SELECT mac FROM device_whitelist WHERE mac IS NOT NULL AND mac != '' AND active = 1"
+    )?;
+    let rows = stmt.query_map([], |row| row.get(0))?;
+
+    let mut macs = Vec::new();
+    for mac in rows {
+        macs.push(mac?);
+    }
+    Ok(macs)
 }
+}
+
 
 fn apply_sqlcipher_key(conn: &Connection, key: &str) -> Result<()> {
     conn.pragma_update(None, "key", key)?;

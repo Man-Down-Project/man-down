@@ -216,15 +216,24 @@ void handle_edgeid_provision(byte* payload, unsigned int length){
 
     char* token = strtok(buffer, ",");
 
+    /*
+    while(token != nullptr && count < MAX_APPROVED_EDGE){
+        Serial.print("Provisioned MAC raw: ");
+        Serial.println(token);
+
+        token = strtok(nullptr, ",");
+    }
+        */
+
     while(token != nullptr && count < MAX_APPROVED_EDGE){
         
-        int id = atoi(token);
+        uint8_t mac[MAC_LEN];
 
-        if(id > 0 && id < 255){
-            for(int j = 0; j < MAC_LEN; j++){
-                provisioned[count][j] = (uint8_t)id;
-            }
+        if(hexStringToByte(token, mac, MAC_LEN)){
+            memcpy(provisioned[count], mac, MAC_LEN);
             count++;
+        }else{
+            Serial.println("Invalid Mac in provisioning payload");
         }
 
         token = strtok(nullptr, ",");

@@ -14,3 +14,4 @@
 void ble_init(const char* node_name);
 void ble_loop(AuthNode &auth);
 bool isMacInWhitelist(const uint8_t* mac, AuthNode &auth);
+bool parseMac(const String &addr, uint8_t mac[6]);

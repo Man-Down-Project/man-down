@@ -144,18 +144,65 @@ void ble_poll(AuthNode &auth){
 }
 
 bool isMacInWhitelist(const uint8_t* mac, AuthNode &auth){
+  //
+  Serial.print("Checking MAC: ");
+  for (int i = 0; i < 6; i++) {
+    Serial.print(mac[i], HEX);
+      if (i < 5) Serial.print(":");
+  }
+  Serial.println();
+  //
+  
   for(int i = 0; i < MAX_APPROVED_EDGE; i++){
     const uint8_t* entry = auth.getWhiteListEntry(i);
 
-    if(!entry) continue;
-    if(entry[0] == EMPTY_ID) continue;
+    //
+    Serial.print("Entry ");
+    Serial.print(i);  
+    Serial.print(": ");
+    //
+    //
+    for (int j = 0; j < 6; j++) {
+      Serial.print(entry[j], HEX);
+      if (j < 5) Serial.print(":");
+    }
+    Serial.println();
+    //
+    
+    bool isEmpty = true;
 
-    if(memcmp(mac, entry, 6) == 0){
+    for(int j = 0; j < 6; j++){
+      if(entry[j] != EMPTY_ID){
+        isEmpty = false;
+        break;
+      }
+    }
+    if (isEmpty) continue;
+
+    if(memcmp(mac, entry, MAC_LEN) == 0){
+      Serial.println("Match found");
       return true;
     }
   }
-
+  Serial.println("No match found");
   return false;
+}
+bool parseMac(const String &addr, uint8_t mac[6]) {
+  int values[6];
+
+  if (sscanf(addr.c_str(),
+    "%x:%x:%x:%x:%x:%x",
+    &values[0], &values[1], &values[2],
+    &values[3], &values[4], &values[5]) != 6) {
+      return false;
+  }
+
+  for (int i = 0; i < 6; i++) {
+    mac[i] = (uint8_t)values[i]; 
+  }
+
+  return true;
+    
 }
 
 void ble_loop(AuthNode &auth){ 
@@ -171,13 +218,8 @@ void ble_loop(AuthNode &auth){
     String addr = central.address();
     addr.trim();
 
-    int parsed = sscanf(addr.c_str(),
-      "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx",
-      &mac[0], &mac[1], &mac[2],
-      &mac[3], &mac[4], &mac[5]);
-
-    if(parsed != 6){
-      Serial.println("MAC parse failed");
+    if(!parseMac(addr, mac)){
+      Serial.println("Mac parse failed");
       central.disconnect();
       return;
     }
