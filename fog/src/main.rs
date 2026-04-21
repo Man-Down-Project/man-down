@@ -298,10 +298,11 @@ async fn run_processor(
             }
 
             Some(mut env) = rx.recv() => {
-                if let Err(e) = env.validate_basic() {
-                    log::warn!("Dropped invalid envelope: {}", e);
-                    continue;
-                }
+                log::info!(
+                    "PROCESSOR received: device_id={} incident={:?}",
+                    env.device_id,
+                    env.incident
+                );
 
                 match &env.incident {
                     Incident::Login { .. } | Incident::Logout { .. } => {
@@ -340,6 +341,16 @@ async fn run_processor(
                         }
                     }
                     _ => {}
+                }
+
+                if let Err(e) = env.validate_basic() {
+                    log::warn!(
+                        "Dropped invalid envelope: device_id={} incident={:?} err={}",
+                        env.device_id,
+                        env.incident,
+                        e
+                    );
+                    continue;
                 }
 
                 match storage.is_device_mac_allowed(&env.device_id) {

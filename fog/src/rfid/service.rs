@@ -70,9 +70,10 @@ pub async fn run_rfid_service(
         };
 
         log::info!(
-            "RFID EVENT: action={} tag={} worker=worker-01",
+            "RFID EVENT: action={} tag={} worker={}",
             action_str,
-            tag_id
+            tag_id,
+            "worker-01"
         );
 
         let scan = RfidScan {
@@ -80,7 +81,17 @@ pub async fn run_rfid_service(
             action,
         };
 
+        let worker_id = scan.worker_id.clone();
+
         let env = scan_to_envelope(tag_id.clone(), scan, seq);
+
+        log::info!(
+            "RFID AUTH outgoing: action={} tag={} env.device_id={} worker_id={}",
+            action_str,
+            tag_id,
+            env.device_id,
+            worker_id
+        );
 
         if let Err(e) = tx.send(env).await {
             log::error!("RFID: failed to send event: {}", e);
