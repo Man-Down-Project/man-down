@@ -359,9 +359,15 @@ async fn run_processor(
                                 continue;
                             };
 
-                            if Utc::now().signed_duration_since(device.selected_at)
-                                > chrono::Duration::seconds(40)
-                            {
+                            let age = Utc::now().signed_duration_since(device.selected_at);
+                            log::info!(
+                                "Selected device candidate: mac={} selected_at={} age_secs={}",
+                                device.device_id,
+                                device.selected_at,
+                                age.num_seconds()
+                            );
+
+                            if age > chrono::Duration::seconds(40) {
                                 log::warn!("Selected device expired");
                                 state.selected_device = None;
                                 continue;
