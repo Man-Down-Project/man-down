@@ -263,7 +263,7 @@ async fn run_processor(
                                 });
 
                                 tokio::spawn(async move {
-                                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                                    tokio::time::sleep(std::time::Duration::from_secs(20)).await;
                                     let _ = ble_stop_tx.send(());
                                     log::info!("BLE: provisioning window closed");
 
