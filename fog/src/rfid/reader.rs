@@ -28,9 +28,9 @@ fn run_reader_loop(
     let mut rst = gpio.get(25)?.into_output();
 
     rst.set_low();
-    thread::sleep(Duration::from_millis(300));
+    thread::sleep(Duration::from_millis(50));
     rst.set_high();
-    thread::sleep(Duration::from_millis(300));
+    thread::sleep(Duration::from_millis(50));
 
     let mut spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 500_000, Mode::Mode0)?;
     println!("RFID: SPI initialized");

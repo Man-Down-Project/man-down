@@ -21,11 +21,11 @@ use crate::rfid::service::run_rfid_service;
 use crate::shared_state::AppState;
 use crate::storage::Storage;
 use chrono::Utc;
-use tokio_rustls::rustls::internal::msgs::base::Payload;
 use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
+use tokio_rustls::rustls::internal::msgs::base::Payload;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -146,17 +146,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-async fn publish_active_macs(
-    storage: &Storage,
-    outgoing_tx: &mpsc::Sender<OutgoingMessage>,
-){
+async fn publish_active_macs(storage: &Storage, outgoing_tx: &mpsc::Sender<OutgoingMessage>) {
     match storage.get_active_macs() {
-        Ok(macs) =>{
+        Ok(macs) => {
             let formatted: Vec<String> = macs
-            .into_iter()
-            .map(|m| m.replace(":", "").to_uppercase())
-            .collect();
-            
+                .into_iter()
+                .map(|m| m.replace(":", "").to_uppercase())
+                .collect();
+
             let payload = formatted.join(",");
 
             let msg = OutgoingMessage {
@@ -166,7 +163,7 @@ async fn publish_active_macs(
 
             if let Err(e) = outgoing_tx.send(msg).await {
                 log::error!("Failed to publish whitelist: {}", e);
-            }else{
+            } else {
                 log::info!("Published whitelist: {}", payload);
             }
         }
@@ -363,7 +360,7 @@ async fn run_processor(
                             };
 
                             if Utc::now().signed_duration_since(device.selected_at)
-                                > chrono::Duration::seconds(10)
+                                > chrono::Duration::seconds(40)
                             {
                                 log::warn!("Selected device expired");
                                 state.selected_device = None;
