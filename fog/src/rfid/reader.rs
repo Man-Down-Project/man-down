@@ -71,8 +71,12 @@ fn run_reader_loop(
                 }
             }
             Err(err) => {
-                println!("RFID error: {:?}", err);
-                thread::sleep(Duration::from_millis(300));
+                if format!("{:?}", err).contains("Timeout") {
+                    thread::sleep(Duration::from_millis(100));
+                } else {
+                    log::error!("RFID: reader error: {:?}", err);
+                    thread::sleep(Duration::from_millis(300));
+                }
             }
         }
     }

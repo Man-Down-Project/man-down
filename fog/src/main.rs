@@ -350,7 +350,7 @@ async fn run_processor(
                             });
 
                         if !device_id_looks_like_mac {
-                            let mut state = app_state.lock().await;
+                            let state = app_state.lock().await;
 
                             let Some(device) = state.selected_device.as_ref() else {
                                 log::warn!(
@@ -359,22 +359,12 @@ async fn run_processor(
                                 continue;
                             };
 
-                            let age = Utc::now().signed_duration_since(device.selected_at);
                             log::info!(
-                                "Selected device candidate: mac={} selected_at={} age_secs={}",
-                                device.device_id,
-                                device.selected_at,
-                                age.num_seconds()
+                                "Using current selected device for auth: {}",
+                                device.device_id
                             );
 
-                            if age > chrono::Duration::seconds(40) {
-                                log::warn!("Selected device expired");
-                                state.selected_device = None;
-                                continue;
-                            }
-
                             env.device_id = device.device_id.clone();
-                            state.selected_device = None;
                         } else {
                             log::debug!(
                                 "Auth event already contains device_id from edge: {}",
@@ -395,20 +385,40 @@ async fn run_processor(
                     continue;
                 }
 
-                match storage.is_device_mac_allowed(&env.device_id) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                    log::warn!(
-                        "Dropped event from non-whitelisted device: {}",
-                        env.device_id
-                    );
-                    continue;
+                match &env.incident {
+                    Incident::Login { .. } | Incident::Logout { .. } => {
+                        match storage.is_device_mac_known(&env.device_id) {
+                            Ok(true) => {}
+                            Ok(false) => {
+                                log::warn!(
+                                    "Dropped auth event from unknown device: {}",
+                                    env.device_id
+                                );
+                                continue;
+                            }
+                            Err(e) => {
+                                log::error!("Failed to check known device MAC: {}", e);
+                                continue;
+                            }
+                        }
+                    }
+                    _ => {
+                        match storage.is_device_mac_allowed(&env.device_id) {
+                            Ok(true) => {}
+                            Ok(false) => {
+                                log::warn!(
+                                    "Dropped event from non-whitelisted device: {}",
+                                    env.device_id
+                                );
+                                continue;
+                            }
+                            Err(e) => {
+                                log::error!("Failed to check device MAC whitelist: {}", e);
+                                continue;
+                            }
+                        }
+                    }
                 }
-                Err(e) => {
-                    log::error!("Failed to check device MAC whitelist: {}", e);
-                    continue;
-                }
-            }
 
                 if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &env.incident {
                     match storage.is_worker_allowed(worker_id) {
@@ -422,6 +432,38 @@ async fn run_processor(
                             continue;
                         }
                     }
+                }
+
+                match &env.incident {
+                    Incident::Login { .. } => {
+                        if let Err(e) = storage.set_device_active(&env.device_id, true) {
+                            log::error!(
+                                "Failed to set device active=1 for {}: {}",
+                                env.device_id,
+                                e
+                            );
+                            continue;
+                        }
+
+                        log::info!("Device marked active: {}", env.device_id);
+                        publish_active_macs(&storage, &outgoing_tx).await;
+                    }
+
+                    Incident::Logout { .. } => {
+                        if let Err(e) = storage.set_device_active(&env.device_id, false) {
+                            log::error!(
+                                "Failed to set device active=0 for {}: {}",
+                                env.device_id,
+                                e
+                            );
+                            continue;
+                        }
+
+                        log::info!("Device marked inactive: {}", env.device_id);
+                        publish_active_macs(&storage, &outgoing_tx).await;
+                    }
+
+                    _ => {}
                 }
 
                 if let Err(e) = storage.insert_event(&env) {
@@ -479,63 +521,6 @@ async fn process_envelope(
         }
         Incident::Login { worker_id } => {
             log::info!("Login worker_id={}", worker_id);
-
-            let mut running = ble_running.lock().await;
-            if *running {
-                log::info!("BLE: provisioning already running, skipping new start");
-                return;
-            }
-
-            *running = true;
-            drop(running);
-
-            let hmac_state = match crate::provisioning::state::load_hmac_state() {
-                Some(h) => h,
-                None => {
-                    log::error!("BLE: no HMAC state found on disk");
-                    let mut running = ble_running.lock().await;
-                    *running = false;
-                    return;
-                }
-            };
-
-            let ble_data = BleProvisioningData::from_hmac_state(&hmac_state);
-            let ble_running_for_server = ble_running.clone();
-            let ble_running_for_timer = ble_running.clone();
-
-            let (tx, rx) = tokio::sync::oneshot::channel();
-            let rfid_enabled_for_ble = rfid_enabled.clone();
-            let app_state_for_ble = app_state.clone();
-            let ble_event_tx_for_ble = ble_event_tx.clone();
-
-            tokio::spawn(async move {
-                log::info!("BLE: starting provisioning (10 secound window)");
-
-                if let Err(e) = start_ble_server(
-                    ble_data,
-                    rx,
-                    rfid_enabled_for_ble,
-                    app_state_for_ble,
-                    ble_event_tx_for_ble,
-                )
-                .await
-                {
-                    log::error!("BLE error: {}", e);
-                }
-
-                let mut running = ble_running_for_server.lock().await;
-                *running = false;
-                log::info!("BLE: provisioning marked as stopped");
-            });
-
-            tokio::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                let _ = tx.send(());
-                log::info!("BLE: provisioning window closed");
-
-                let mut running = ble_running_for_timer.lock().await;
-                *running = false;
-            });
         }
         Incident::Logout { worker_id } => {
             log::info!("Logout worker_id={}", worker_id);

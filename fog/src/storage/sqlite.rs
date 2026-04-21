@@ -103,6 +103,18 @@ impl Storage {
         Ok(rows.next()?.is_some())
     }
 
+    pub fn is_device_mac_known(&self, mac_address: &str) -> Result<bool> {
+        let mut stmt = self.conn.prepare(
+            "SELECT 1
+         FROM device_whitelist
+         WHERE mac = ?1
+         LIMIT 1",
+        )?;
+
+        let mut rows = stmt.query(params![mac_address])?;
+        Ok(rows.next()?.is_some())
+    }
+
     pub fn is_device_mac_allowed(&self, mac_address: &str) -> Result<bool> {
         let mut stmt = self.conn.prepare(
             "SELECT 1
@@ -140,10 +152,20 @@ impl Storage {
     pub fn bind_mac_to_edge_tag(&self, rfid_tag: &str, mac_address: &str) -> Result<()> {
         self.conn.execute(
             "UPDATE device_whitelist
-         SET mac = ?1,
-             active = 1
+         SET mac = ?1
          WHERE rfid_tag = ?2",
             params![mac_address, rfid_tag],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn set_device_active(&self, mac_address: &str, active: bool) -> Result<()> {
+        self.conn.execute(
+            "UPDATE device_whitelist
+         SET active = ?1
+         WHERE mac = ?2",
+            params![if active { 1 } else { 0 }, mac_address],
         )?;
 
         Ok(())
@@ -159,19 +181,18 @@ impl Storage {
     }
 
     pub fn get_active_macs(&self) -> Result<Vec<String>> {
-    let mut stmt = self.conn.prepare(
-        "SELECT mac FROM device_whitelist WHERE mac IS NOT NULL AND mac != '' AND active = 1"
-    )?;
-    let rows = stmt.query_map([], |row| row.get(0))?;
+        let mut stmt = self.conn.prepare(
+            "SELECT mac FROM device_whitelist WHERE mac IS NOT NULL AND mac != '' AND active = 1",
+        )?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
 
-    let mut macs = Vec::new();
-    for mac in rows {
-        macs.push(mac?);
+        let mut macs = Vec::new();
+        for mac in rows {
+            macs.push(mac?);
+        }
+        Ok(macs)
     }
-    Ok(macs)
 }
-}
-
 
 fn apply_sqlcipher_key(conn: &Connection, key: &str) -> Result<()> {
     conn.pragma_update(None, "key", key)?;
