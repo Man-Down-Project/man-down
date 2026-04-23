@@ -137,7 +137,7 @@ impl Storage {
         Ok(rows.next()?.is_some())
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used manually for setup and testing
     pub fn add_edge_tag_to_whitelist(&self, rfid_tag: &str) -> Result<()> {
         self.conn.execute(
             "INSERT OR IGNORE INTO device_whitelist (rfid_tag, mac, active)
@@ -170,7 +170,7 @@ impl Storage {
         Ok(())
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Used manually for setup and testing
     pub fn add_worker_to_whitelist(&self, worker_id: &str) -> Result<()> {
         self.conn.execute(
             "INSERT OR IGNORE INTO worker_whitelist (worker_id, active)

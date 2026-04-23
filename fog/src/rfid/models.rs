@@ -22,6 +22,10 @@ pub enum RfidEvent {
     EdgeTag { tag_id: String },
 }
 
+// Current tag classification is based on known RFID prefixes from our test hardware.
+// This is intentionally not universal yet, since different cards/tags can use different
+// prefixes depending on hardware/vendor. These values are used for our current setup
+// and can be expanded later if more tag types are introduced.
 pub fn classify_tag(tag_id: &str) -> RfidTagKind {
     let trimmed = tag_id.trim();
 
