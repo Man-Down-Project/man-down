@@ -83,7 +83,6 @@ pub async fn start_ble_server(
                                     state.selected_device =
                                         Some(crate::shared_state::PendingDeviceSelection {
                                             device_id: addr_str.clone(),
-                                            selected_at: chrono::Utc::now(),
                                         });
 
                                     should_emit_event = true;

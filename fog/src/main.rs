@@ -25,7 +25,6 @@ use std::fs;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
-use tokio_rustls::rustls::internal::msgs::base::Payload;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -208,7 +207,6 @@ async fn run_processor(
                                     let mut state = app_state.lock().await;
                                     state.pending_edge_tag = Some(crate::shared_state::PendingEdgeTag {
                                         rfid_tag: tag_id.clone(),
-                                        selected_at: Utc::now(),
                                     });
                                 }
 
@@ -279,9 +277,6 @@ async fn run_processor(
                             }
                         }
                     }
-                    crate::rfid::models::RfidEvent::Worker(_) => {
-                        // används inte ännu
-                    }
                 }
             }
 
@@ -308,7 +303,6 @@ async fn run_processor(
                                         state.pending_edge_tag = None;
                                         state.selected_device = Some(crate::shared_state::PendingDeviceSelection {
                                             device_id: mac_address.clone(),
-                                            selected_at: Utc::now(),
                                         });
 
                                         log::info!("Current device set from BLE connection: {}", mac_address);
@@ -496,12 +490,11 @@ async fn run_processor(
 
 async fn process_envelope(
     env: Envelope,
-    ble_running: Arc<Mutex<bool>>,
-    rfid_enabled: Arc<AtomicBool>,
-    app_state: Arc<Mutex<AppState>>,
-    ble_event_tx: mpsc::Sender<crate::ble::BleEvent>,
+    _ble_running: Arc<Mutex<bool>>,
+    _rfid_enabled: Arc<AtomicBool>,
+    _app_state: Arc<Mutex<AppState>>,
+    _ble_event_tx: mpsc::Sender<crate::ble::BleEvent>,
 ) {
-    let _ = &rfid_enabled;
     log::info!(
         "Processing device_id={} seq={} incident={:?}",
         env.device_id,

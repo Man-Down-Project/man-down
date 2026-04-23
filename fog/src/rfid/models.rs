@@ -19,19 +19,16 @@ pub enum RfidTagKind {
 
 #[derive(Debug, Clone)]
 pub enum RfidEvent {
-    Worker(RfidScan),
     EdgeTag { tag_id: String },
 }
 
 pub fn classify_tag(tag_id: &str) -> RfidTagKind {
     let trimmed = tag_id.trim();
 
-    if trimmed.starts_with("71") {
+    if trimmed.starts_with("71") || trimmed.starts_with("63") || trimmed.starts_with('5') {
         RfidTagKind::Edge
     } else if trimmed.starts_with('4') {
         RfidTagKind::Worker
-    } else if trimmed.starts_with('5') {
-        RfidTagKind::Edge
     } else {
         RfidTagKind::Unknown
     }
