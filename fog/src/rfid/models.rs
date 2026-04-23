@@ -27,7 +27,7 @@ pub fn classify_tag(tag_id: &str) -> RfidTagKind {
 
     if trimmed.starts_with("71") || trimmed.starts_with("63") || trimmed.starts_with('5') {
         RfidTagKind::Edge
-    } else if trimmed.starts_with('4') {
+    } else if trimmed.starts_with('4') || trimmed.starts_with("5") {
         RfidTagKind::Worker
     } else {
         RfidTagKind::Unknown
