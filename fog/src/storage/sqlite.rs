@@ -24,8 +24,6 @@ impl Storage {
         Ok(Self { conn })
     }
 
-    // MQTT QoS1 kan leverera samma event flera gånger.
-    // UNIQUE(device_id, seq) + INSERT OR IGNORE förhindrar dubletter.
     pub fn insert_event(&self, env: &Envelope) -> Result<()> {
         let incident_json =
             serde_json::to_string(&env.incident).map_err(|_| rusqlite::Error::InvalidQuery)?;
