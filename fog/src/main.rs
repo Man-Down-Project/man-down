@@ -26,6 +26,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use tokio::sync::{Mutex, mpsc, watch};
 
+#[allow(clippy::arc_with_non_send_sync)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let _ = dotenvy::dotenv();
@@ -111,17 +112,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     publish_initial_provisioning(&outgoing_tx, &provisioning_state).await;
 
-    let processor = run_processor(
-        rx,
-        edge_event_rx,
-        ble_event_rx,
-        storage.clone(),
-        ble_running.clone(),
-        rfid_enabled.clone(),
-        app_state.clone(),
-        ble_event_tx.clone(),
-        outgoing_tx.clone(),
-    );
+    let processor_ctx = ProcessorContext {
+        storage: storage.clone(),
+        ble_running: ble_running.clone(),
+        rfid_enabled: rfid_enabled.clone(),
+        app_state: app_state.clone(),
+        ble_event_tx: ble_event_tx.clone(),
+        outgoing_tx: outgoing_tx.clone(),
+    };
+
+    let processor = run_processor(rx, edge_event_rx, ble_event_rx, processor_ctx);
 
     tokio::select! {
         _= tokio::signal::ctrl_c() => {
@@ -185,26 +185,30 @@ async fn publish_initial_provisioning(
     }
 }
 
-async fn run_processor(
-    mut rx: mpsc::Receiver<Envelope>,
-    mut edge_event_rx: mpsc::Receiver<crate::rfid::models::RfidEvent>,
-    mut ble_event_rx: mpsc::Receiver<crate::ble::BleEvent>,
+struct ProcessorContext {
     storage: Arc<Storage>,
     ble_running: Arc<Mutex<bool>>,
     rfid_enabled: Arc<AtomicBool>,
     app_state: Arc<Mutex<AppState>>,
     ble_event_tx: mpsc::Sender<crate::ble::BleEvent>,
     outgoing_tx: mpsc::Sender<OutgoingMessage>,
+}
+
+async fn run_processor(
+    mut rx: mpsc::Receiver<Envelope>,
+    mut edge_event_rx: mpsc::Receiver<crate::rfid::models::RfidEvent>,
+    mut ble_event_rx: mpsc::Receiver<crate::ble::BleEvent>,
+    ctx: ProcessorContext,
 ) {
     loop {
         tokio::select! {
             Some(edge_event) = edge_event_rx.recv() => {
                 match edge_event {
                     crate::rfid::models::RfidEvent::EdgeTag { tag_id } => {
-                        match storage.edge_tag_exists(&tag_id) {
+                        match ctx.storage.edge_tag_exists(&tag_id) {
                             Ok(true) => {
                                 {
-                                    let mut state = app_state.lock().await;
+                                    let mut state = ctx.app_state.lock().await;
                                     state.pending_edge_tag = Some(crate::shared_state::PendingEdgeTag {
                                         rfid_tag: tag_id.clone(),
                                     });
@@ -212,7 +216,7 @@ async fn run_processor(
 
                                 log::info!("Edge tag approved and stored as pending: {}", tag_id);
 
-                                let mut running = ble_running.lock().await;
+                                let mut running = ctx.ble_running.lock().await;
                                 if *running {
                                     log::info!("BLE: provisioning already running, keeping current session");
                                     continue;
@@ -225,18 +229,18 @@ async fn run_processor(
                                     Some(h) => h,
                                     None => {
                                         log::error!("BLE: no HMAC state found on disk");
-                                        let mut running = ble_running.lock().await;
+                                        let mut running = ctx.ble_running.lock().await;
                                         *running = false;
                                         continue;
                                     }
                                 };
 
                                 let ble_data = BleProvisioningData::from_hmac_state(&hmac_state);
-                                let ble_running_for_server = ble_running.clone();
-                                let ble_running_for_timer = ble_running.clone();
-                                let rfid_enabled_for_ble = rfid_enabled.clone();
-                                let app_state_for_ble = app_state.clone();
-                                let ble_event_tx_for_ble = ble_event_tx.clone();
+                                let ble_running_for_server = ctx.ble_running.clone();
+                                let ble_running_for_timer = ctx.ble_running.clone();
+                                let rfid_enabled_for_ble = ctx.rfid_enabled.clone();
+                                let app_state_for_ble = ctx.app_state.clone();
+                                let ble_event_tx_for_ble = ctx.ble_event_tx.clone();
 
                                 let (ble_stop_tx, ble_stop_rx) = tokio::sync::oneshot::channel();
 
@@ -284,22 +288,22 @@ async fn run_processor(
                 match ble_event {
                     crate::ble::BleEvent::DeviceConnected { mac_address } => {
                         let pending = {
-                            let state = app_state.lock().await;
+                            let state = ctx.app_state.lock().await;
                             state.pending_edge_tag.clone()
                         };
 
                         match pending {
                             Some(edge_tag) => {
-                                match storage.bind_mac_to_edge_tag(&edge_tag.rfid_tag, &mac_address) {
+                                match ctx.storage.bind_mac_to_edge_tag(&edge_tag.rfid_tag, &mac_address) {
                                     Ok(()) => {
                                         log::info!(
                                             "Bound MAC {} to edge tag {}",
                                             mac_address,
                                             edge_tag.rfid_tag
                                         );
-                                        publish_active_macs(&storage, &outgoing_tx).await;
+                                        publish_active_macs(&ctx.storage, &ctx.outgoing_tx).await;
 
-                                        let mut state = app_state.lock().await;
+                                        let mut state = ctx.app_state.lock().await;
                                         state.pending_edge_tag = None;
                                         state.selected_device = Some(crate::shared_state::PendingDeviceSelection {
                                             device_id: mac_address.clone(),
@@ -344,7 +348,7 @@ async fn run_processor(
                             });
 
                         if !device_id_looks_like_mac {
-                            let state = app_state.lock().await;
+                            let state = ctx.app_state.lock().await;
 
                             let Some(device) = state.selected_device.as_ref() else {
                                 log::warn!(
@@ -381,7 +385,7 @@ async fn run_processor(
 
                 match &env.incident {
                     Incident::Login { .. } | Incident::Logout { .. } => {
-                        match storage.is_device_mac_known(&env.device_id) {
+                        match ctx.storage.is_device_mac_known(&env.device_id) {
                             Ok(true) => {}
                             Ok(false) => {
                                 log::warn!(
@@ -397,7 +401,7 @@ async fn run_processor(
                         }
                     }
                     _ => {
-                        match storage.is_device_mac_allowed(&env.device_id) {
+                        match ctx.storage.is_device_mac_allowed(&env.device_id) {
                             Ok(true) => {}
                             Ok(false) => {
                                 log::warn!(
@@ -415,7 +419,7 @@ async fn run_processor(
                 }
 
                 if let Incident::Login { worker_id } | Incident::Logout { worker_id } = &env.incident {
-                    match storage.is_worker_allowed(worker_id) {
+                    match ctx.storage.is_worker_allowed(worker_id) {
                         Ok(true) => {}
                         Ok(false) => {
                             log::warn!("Dropped event from non-whitelisted worker: {}", worker_id);
@@ -430,7 +434,7 @@ async fn run_processor(
 
                 match &env.incident {
                     Incident::Login { .. } => {
-                        if let Err(e) = storage.set_device_active(&env.device_id, true) {
+                        if let Err(e) = ctx.storage.set_device_active(&env.device_id, true) {
                             log::error!(
                                 "Failed to set device active=1 for {}: {}",
                                 env.device_id,
@@ -440,11 +444,11 @@ async fn run_processor(
                         }
 
                         log::info!("Device marked active: {}", env.device_id);
-                        publish_active_macs(&storage, &outgoing_tx).await;
+                        publish_active_macs(&ctx.storage, &ctx.outgoing_tx).await;
                     }
 
                     Incident::Logout { .. } => {
-                        if let Err(e) = storage.set_device_active(&env.device_id, false) {
+                        if let Err(e) = ctx.storage.set_device_active(&env.device_id, false) {
                             log::error!(
                                 "Failed to set device active=0 for {}: {}",
                                 env.device_id,
@@ -454,17 +458,17 @@ async fn run_processor(
                         }
 
                         log::info!("Device marked inactive: {}", env.device_id);
-                        publish_active_macs(&storage, &outgoing_tx).await;
+                        publish_active_macs(&ctx.storage, &ctx.outgoing_tx).await;
                     }
 
                     _ => {}
                 }
 
-                if let Err(e) = storage.insert_event(&env) {
+                if let Err(e) = ctx.storage.insert_event(&env) {
                     log::error!("Failed to store event: {}", e);
                 }
 
-                if let Err(e) = storage.insert_auth_event(&env) {
+                if let Err(e) = ctx.storage.insert_auth_event(&env) {
                     log::error!("Failed to store auth event: {}", e);
                 } else {
                     log::info!("Stored auth event: {:?}", env.incident);
@@ -472,10 +476,10 @@ async fn run_processor(
 
                 process_envelope(
                     env,
-                    ble_running.clone(),
-                    rfid_enabled.clone(),
-                    app_state.clone(),
-                    ble_event_tx.clone(),
+                    ctx.ble_running.clone(),
+                    ctx.rfid_enabled.clone(),
+                    ctx.app_state.clone(),
+                    ctx.ble_event_tx.clone(),
                 )
                 .await;
             }

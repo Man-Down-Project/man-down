@@ -187,7 +187,10 @@ async fn handle_event(
                     hmac_hex: hex::encode_upper(hmac_bytes),
                 };
 
-                log::info!("DEBUG event bytes: {}", hex::encode_upper(edge.to_bytes()));
+                log::info!(
+                    "DEBUG event bytes: {}",
+                    hex::encode_upper(edge.into_bytes())
+                );
                 log::info!("DEBUG incoming hmac: {}", hex::encode_upper(hmac_bytes));
 
                 if let Err(e) = verify_hmac(&signed, &key) {

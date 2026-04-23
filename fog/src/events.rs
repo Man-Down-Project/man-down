@@ -174,7 +174,7 @@ impl EdgeEvent {
         })
     }
 
-    pub fn to_bytes(&self) -> [u8; 12] {
+    pub fn into_bytes(self) -> [u8; 12] {
         let ts = self.time_stamp.to_le_bytes();
         [
             self.device_id[0],
@@ -277,7 +277,7 @@ pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
 
     let mut mac = HmacSha256::new_from_slice(key).map_err(|e| format!("invalid HMAC key: {e}"))?;
 
-    mac.update(&signed.event.to_bytes());
+    mac.update(&signed.event.into_bytes());
 
     let expected = hex::decode(&signed.hmac_hex).map_err(|e| format!("invalid hmac hex: {e}"))?;
 
@@ -290,7 +290,7 @@ pub fn verify_hmac(signed: &SignedEdgeEvent, key: &[u8]) -> Result<(), String> {
 
     let full = mac.finalize().into_bytes();
 
-    log::info!("DEBUG computed hmac (full): {}", hex::encode_upper(&full));
+    log::info!("DEBUG computed hmac (full): {}", hex::encode_upper(full));
     log::info!("DEBUG computed hmac (8): {}", hex::encode_upper(&full[..8]));
 
     if &full[..8] == expected.as_slice() {
